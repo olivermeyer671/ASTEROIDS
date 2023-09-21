@@ -13,14 +13,18 @@ clock = pygame.time.Clock()
 WIDTH,HEIGHT = 800,600
 BACKGROUND_COLOR = (0,0,0)
 
+#fps limiter
+FPS = 120
+
 #master speed control
-SPEED_MULTIPLIER = 5
+SPEED_MULTIPLIER = (10 * FPS) // FPS
 
 #top score display color
 FONT_COLOR = (255,0,0)
 
 #turret constants
-TURRET_RADIUS = 50
+TURRET_RADIUS = 20
+TURRET_HEIGHT = 50
 TURRET_COLOR = (255,0,0)
 
 #bullet constants
@@ -81,9 +85,6 @@ SOUND_HIT.set_volume(0.4)
 #setup the display
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("ASTEROIDS")
-
-#do not quit game yet
-QUIT_GAME = False
 
 #class for bullets
 class Bullet:
@@ -211,12 +212,12 @@ class GameState(State):
     def bullet_angle(self):
         self.mouse_x, self.mouse_y = pygame.mouse.get_pos()
         dx = self.mouse_x - WIDTH//2
-        dy = self.mouse_y - HEIGHT
+        dy = self.mouse_y - (HEIGHT - TURRET_HEIGHT)
         return math.atan2(dy,dx)
     
     def bullet_coordinate(self, angle, radius):
         x = WIDTH // 2 + int(radius * math.cos(angle))
-        y = HEIGHT + int(radius * math.sin(angle))
+        y = (HEIGHT - TURRET_HEIGHT) + int(radius * math.sin(angle))
         return (x, y)
 
     def create_bullet(self):
@@ -263,7 +264,7 @@ class GameState(State):
                     self.asteroids.remove(asteroid)
                     SOUND_HIT.play()
                     SCORE += 10
-                    if SCORE >= TOP_SCORE:
+                    if SCORE > TOP_SCORE:
                         TOP_SCORE = SCORE
                         FONT_COLOR = (0,255,0)
 
@@ -293,6 +294,10 @@ class GameState(State):
         for building in self.buildings:
             building.render()
 
+        #display the turret
+        pygame.draw.circle(screen, TURRET_COLOR, (WIDTH // 2, HEIGHT - TURRET_HEIGHT), TURRET_RADIUS)
+        pygame.draw.line(screen, TURRET_COLOR, (WIDTH // 2, HEIGHT), (WIDTH // 2, HEIGHT - TURRET_HEIGHT), TURRET_RADIUS)
+
         #display score
         font = pygame.font.Font(None, 36)
         text_score = font.render(f'SCORE: {SCORE}', True, (255,0,0))
@@ -317,6 +322,9 @@ class GameState(State):
 #start game on title screen
 CURRENT_STATE = TitleState()
 
+#exit variable
+QUIT_GAME = False
+
 #main loop
 while not QUIT_GAME:
     for event in pygame.event.get():
@@ -335,8 +343,8 @@ while not QUIT_GAME:
     #update display
     pygame.display.flip()
 
-    #limit to roughly 120 fps
-    clock.tick(120)
+    #limit to the fps constant
+    clock.tick(FPS)
 
 #quit pygame
 pygame.quit()

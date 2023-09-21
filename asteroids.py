@@ -120,14 +120,23 @@ class State:
 #title state
 class TitleState(State):
     global SCORE, LIVES
+
+    def __init__(self):
+        super().__init__()
+        pygame.mixer.music.load("audio/title.mp3")
+        pygame.mixer.music.play(-1)
+        SCORE = 0
+        LIVES = 4
+    
+    def number(self):
+        return 0
+
     def handle_events(self):
         if any(pygame.key.get_pressed()):
-            pygame.mixer.music.stop()
             self.next_state = GameState()
 
     def update(self):
-        SCORE = 0
-        LIVES = 4
+        pass
 
     def render(self, screen):
         #clear screen
@@ -138,28 +147,22 @@ class TitleState(State):
         text = font.render("ASTEROIDS", True, (255,0,0))
         screen.blit(text, ((WIDTH // 2) - (text.get_width() // 2), (HEIGHT // 2) - (text.get_height() // 2)))
 
-        #play music
-
-        try:
-            pygame.mixer.init()
-            pygame.mixer.music.set_volume(1)
-            pygame.mixer.music.load("audio/title.mp3")
-            pygame.mixer.music.play(-1)
-        
-        except pygame.error as e:
-            print(f"an error occurred: {e}")
-
-
 #game state
 class GameState(State):
     def __init__(self):
         super().__init__()
+        pygame.mixer.music.load("audio/theme.mp3")
+        pygame.mixer.music.play(-1)
+        pygame.time.delay(500)
         self.asteroids = []
         self.bullets = []
         self.buildings = [Building(WIDTH//6, HEIGHT, BUILDING_RADIUS),
                           Building(2*WIDTH//6, HEIGHT, BUILDING_RADIUS),
                           Building(4*WIDTH//6, HEIGHT, BUILDING_RADIUS),
                           Building(5*WIDTH//6, HEIGHT, BUILDING_RADIUS)]
+          
+    def number(self):
+        return 1
 
     def create_asteroid(self):
             new_asteroid = Asteroid(random.uniform(0, WIDTH), 0, random.uniform(math.pi/4, 3*math.pi/4), random.uniform(ASTEROID_SPEED/2, 2*ASTEROID_SPEED), random.uniform(ASTEROID_RADIUS/2, 2*ASTEROID_RADIUS), ASTEROID_COLOR)
@@ -217,7 +220,6 @@ class GameState(State):
         for bullet in self.bullets:
             bullet.update()
 
-
         #check for collisions and update stats
         for asteroid in self.asteroids:
             for bullet in self.bullets:
@@ -236,11 +238,7 @@ class GameState(State):
                     if LIVES <= 0:
                         LIVES = 4
                         SOUND_GAME_OVER.play()
-                        pygame.mixer.music.stop()
                         self.next_state = TitleState()
-    
-  
-
 
     def render(self, screen):
         #clear screen
@@ -255,13 +253,8 @@ class GameState(State):
         for building in self.buildings:
             building.render()
 
-       
-        
-
-
 #start game on title screen
-initial_state = TitleState()
-CURRENT_STATE = initial_state
+CURRENT_STATE = TitleState()
 
 #main loop
 while not QUIT_GAME:
@@ -284,5 +277,3 @@ while not QUIT_GAME:
 #quit pygame
 pygame.quit()
 sys.exit()
-
-

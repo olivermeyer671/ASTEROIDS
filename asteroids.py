@@ -2,6 +2,7 @@ import pygame
 import sys
 import math
 import random
+import json
 
 #initialize pygame
 pygame.init()
@@ -11,7 +12,12 @@ clock = pygame.time.Clock()
 #screen constants
 WIDTH,HEIGHT = 800,600
 BACKGROUND_COLOR = (0,0,0)
+
+#master speed control
 SPEED_MULTIPLIER = 5
+
+#top score display color
+FONT_COLOR = (255,0,0)
 
 #turret constants
 TURRET_RADIUS = 50
@@ -38,12 +44,32 @@ BUILDING_RADIUS = 50
 #game data
 SCORE = 0
 LIVES = 4
-TOP_SCORE = 0
+
+#data file
+DATA_FILE = "data.json"
+
+#load data from file
+def load_data():
+    try:
+        with open(DATA_FILE, "r") as file:
+            data = json.load(file)
+            return data.get("TOP_SCORE", 0)
+    except FileNotFoundError:
+        return 0
+    
+#top score
+TOP_SCORE = load_data()
+
+#save data to file
+def save_data():
+    data = {"TOP_SCORE": TOP_SCORE}
+    with open(DATA_FILE, "w") as file:
+        json.dump(data, file)
 
 #audio constants
-SOUND_BULLET = pygame.mixer.Sound("audio/blipSelect.wav")
-SOUND_HIT = pygame.mixer.Sound("audio/explosion.wav")
-SOUND_EXPLOSION = pygame.mixer.Sound("audio/random.wav")
+SOUND_BULLET = pygame.mixer.Sound("audio/bullet.wav")
+SOUND_HIT = pygame.mixer.Sound("audio/hit.wav")
+SOUND_EXPLOSION = pygame.mixer.Sound("audio/explosion.wav")
 SOUND_GAME_OVER = pygame.mixer.Sound("audio/gameover.wav")
 MUSIC_THEME = pygame.mixer.music.load("audio/theme.mp3")
 MUSIC_TITLE = pygame.mixer.music.load("audio/title.mp3")
@@ -147,10 +173,17 @@ class TitleState(State):
         text = font.render("ASTEROIDS", True, (255,0,0))
         screen.blit(text, ((WIDTH // 2) - (text.get_width() // 2), (HEIGHT // 2) - (text.get_height() // 2)))
 
+        #display top score
+        font = pygame.font.Font(None, 36)
+        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR)
+        screen.blit(text_top_score, ((WIDTH // 2) - (text_top_score.get_width() // 2), 10))
+
 #game state
 class GameState(State):
     def __init__(self):
+        global FONT_COLOR, SCORE, LIVES
         super().__init__()
+        FONT_COLOR = (255,0,0)
         SCORE = 0
         LIVES = 4
         pygame.mixer.music.load("audio/theme.mp3")
@@ -203,7 +236,7 @@ class GameState(State):
         return distance < self.c1.radius + self.c2.radius
 
     def update(self):
-        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR
 
         #update asteroids
         if pygame.time.get_ticks() - LAST_ASTEROID_TIME > ASTEROID_COOLDOWN:
@@ -230,6 +263,9 @@ class GameState(State):
                     self.asteroids.remove(asteroid)
                     SOUND_HIT.play()
                     SCORE += 10
+                    if SCORE >= TOP_SCORE:
+                        TOP_SCORE = SCORE
+                        FONT_COLOR = (0,255,0)
 
         for asteroid in self.asteroids:
             for building in self.buildings:
@@ -240,6 +276,7 @@ class GameState(State):
                     SOUND_EXPLOSION.play()
                     if LIVES <= 0:
                         LIVES = 4
+                        save_data()
                         SOUND_GAME_OVER.play()
                         self.next_state = TitleState()
 
@@ -266,11 +303,16 @@ class GameState(State):
         text_lives = font.render(f'LIVES: {LIVES}', True, (255,0,0))
         screen.blit(text_lives, (WIDTH - text_lives.get_width() - 10,10))
 
+        #display top score
+        font = pygame.font.Font(None, 36)
+        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR)
+        screen.blit(text_top_score, ((WIDTH // 2) - (text_top_score.get_width() // 2), 10))
+
         #display fps
         font = pygame.font.Font(None, 36)
         fps = clock.get_fps()
         text_fps = font.render(f'FPS: {fps:.0f}', True, (255,0,0))
-        screen.blit(text_fps, ((WIDTH // 2) - (text_fps.get_width() // 2), 10))
+        screen.blit(text_fps, ((WIDTH // 2) - (text_fps.get_width() // 2), 10 + text_top_score.get_height() + 10))
 
 #start game on title screen
 CURRENT_STATE = TitleState()

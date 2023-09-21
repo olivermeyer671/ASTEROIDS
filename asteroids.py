@@ -117,6 +117,7 @@ class State:
 
 #title state
 class TitleState(State):
+    global SCORE, LIVES
     def handle_events(self):
         if any(pygame.key.get_pressed()):
             self.next_state = GameState()
@@ -186,8 +187,14 @@ class GameState(State):
             if bullet.x < 0 or bullet.x > WIDTH or bullet.y < 0 or bullet.y > HEIGHT:
                 self.bullets.remove(bullet)
 
+    def check_collision(self, c1, c2):
+        self.c1 = c1
+        self.c2 = c2
+        distance = math.sqrt((self.c1.x - self.c2.x)**2 + (self.c1.y - self.c2.y)**2)
+        return distance < self.c1.radius + self.c2.radius
+
     def update(self):
-        global LAST_BULLET_TIME, LAST_ASTEROID_TIME
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE
 
         #update asteroids
         if pygame.time.get_ticks() - LAST_ASTEROID_TIME > ASTEROID_COOLDOWN:
@@ -204,6 +211,24 @@ class GameState(State):
         self.update_bullet()
         for bullet in self.bullets:
             bullet.update()
+
+
+        #check for collisions
+        for asteroid in self.asteroids:
+            for bullet in self.bullets:
+                if self.check_collision(asteroid, bullet):
+                    self.bullets.remove(bullet)
+                    self.asteroids.remove(asteroid)
+                    SCORE += 10
+
+            for building in self.buildings:
+                if self.check_collision(asteroid, building):
+                    self.buildings.remove(building)
+                    self.asteroids.remove(asteroid)
+                    LIVES -= 1
+                    if LIVES <= 0:
+                        LIVES = 4
+                        self.next_state = TitleState()
     
   
 

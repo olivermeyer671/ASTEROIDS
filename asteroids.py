@@ -19,14 +19,19 @@ TURRET_COLOR = (255,0,0)
 BULLET_SPEED = 0.5
 BULLET_RADIUS = 2
 BULLET_COLOR = (0,0,255)
+BULLET_COOLDOWN = 50
+LAST_BULLET_TIME = pygame.time.get_ticks()
 
 #asteroid constants
 ASTEROID_SPEED = 0.25
 ASTEROID_RADIUS = 10
 ASTEROID_COLOR = (0,255,0)
+ASTEROID_COOLDOWN = 500
+LAST_ASTEROID_TIME = pygame.time.get_ticks()
 
 #building constants
 BUILDING_COLOR = (255,0,0)
+BUILDING_RADIUS = 50
 
 #game data
 SCORE = 0
@@ -146,7 +151,10 @@ class GameState(State):
         super().__init__()
         self.asteroids = []
         self.bullets = []
-        self.buildings = []
+        self.buildings = [Building(WIDTH//6, HEIGHT, BUILDING_RADIUS),
+                          Building(2*WIDTH//6, HEIGHT, BUILDING_RADIUS),
+                          Building(4*WIDTH//6, HEIGHT, BUILDING_RADIUS),
+                          Building(5*WIDTH//6, HEIGHT, BUILDING_RADIUS)]
 
     def create_asteroid(self):
             new_asteroid = Asteroid(random.uniform(0, WIDTH), 0, random.uniform(math.pi/4, 3*math.pi/4), random.uniform(ASTEROID_SPEED/2, 2*ASTEROID_SPEED), random.uniform(ASTEROID_RADIUS/2, 2*ASTEROID_RADIUS), ASTEROID_COLOR)
@@ -167,11 +175,9 @@ class GameState(State):
         x = WIDTH // 2 + int(radius * math.cos(angle))
         y = HEIGHT + int(radius * math.sin(angle))
         return (x, y)
-        
-
 
     def create_bullet(self):
-        bullet_position = self.bullet_coordinate(self.bullet_angle(), 200)
+        bullet_position = self.bullet_coordinate(self.bullet_angle(), TURRET_RADIUS)
         new_bullet = Bullet(bullet_position[0], bullet_position[1], self.bullet_angle(), BULLET_SPEED, BULLET_RADIUS, BULLET_COLOR)
         self.bullets.append(new_bullet)
 
@@ -181,15 +187,20 @@ class GameState(State):
                 self.bullets.remove(bullet)
 
     def update(self):
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME
 
         #update asteroids
-        self.create_asteroid()
+        if pygame.time.get_ticks() - LAST_ASTEROID_TIME > ASTEROID_COOLDOWN:
+            self.create_asteroid()
+            LAST_ASTEROID_TIME = pygame.time.get_ticks()
         self.update_asteroid()
         for asteroid in self.asteroids:
             asteroid.update()
 
         #update bullets
-        self.create_bullet()
+        if pygame.mouse.get_pressed()[0] and pygame.time.get_ticks() - LAST_BULLET_TIME > BULLET_COOLDOWN:
+            self.create_bullet()
+            LAST_BULLET_TIME = pygame.time.get_ticks()
         self.update_bullet()
         for bullet in self.bullets:
             bullet.update()
@@ -205,6 +216,9 @@ class GameState(State):
 
         for bullet in self.bullets:
             bullet.render()
+
+        for building in self.buildings:
+            building.render()
         
 
 

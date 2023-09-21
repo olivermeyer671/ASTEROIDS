@@ -42,7 +42,9 @@ TOP_SCORE = 0
 SOUND_BULLET = pygame.mixer.Sound("audio/blipSelect.wav")
 SOUND_HIT = pygame.mixer.Sound("audio/explosion.wav")
 SOUND_EXPLOSION = pygame.mixer.Sound("audio/random.wav")
+SOUND_GAME_OVER = pygame.mixer.Sound("audio/gameover.wav")
 MUSIC_THEME = pygame.mixer.music.load("audio/theme.mp3")
+MUSIC_TITLE = pygame.mixer.music.load("audio/title.mp3")
 
 #audio mixing
 SOUND_BULLET.set_volume(0.3)
@@ -120,6 +122,7 @@ class TitleState(State):
     global SCORE, LIVES
     def handle_events(self):
         if any(pygame.key.get_pressed()):
+            pygame.mixer.music.stop()
             self.next_state = GameState()
 
     def update(self):
@@ -136,10 +139,11 @@ class TitleState(State):
         screen.blit(text, ((WIDTH // 2) - (text.get_width() // 2), (HEIGHT // 2) - (text.get_height() // 2)))
 
         #play music
+
         try:
             pygame.mixer.init()
             pygame.mixer.music.set_volume(1)
-            pygame.mixer.music.load("audio/theme.mp3")
+            pygame.mixer.music.load("audio/title.mp3")
             pygame.mixer.music.play(-1)
         
         except pygame.error as e:
@@ -208,17 +212,19 @@ class GameState(State):
         if pygame.mouse.get_pressed()[0] and pygame.time.get_ticks() - LAST_BULLET_TIME > BULLET_COOLDOWN:
             self.create_bullet()
             LAST_BULLET_TIME = pygame.time.get_ticks()
+            SOUND_BULLET.play()
         self.update_bullet()
         for bullet in self.bullets:
             bullet.update()
 
 
-        #check for collisions
+        #check for collisions and update stats
         for asteroid in self.asteroids:
             for bullet in self.bullets:
                 if self.check_collision(asteroid, bullet):
                     self.bullets.remove(bullet)
                     self.asteroids.remove(asteroid)
+                    SOUND_HIT.play()
                     SCORE += 10
 
             for building in self.buildings:
@@ -226,8 +232,11 @@ class GameState(State):
                     self.buildings.remove(building)
                     self.asteroids.remove(asteroid)
                     LIVES -= 1
+                    SOUND_EXPLOSION.play()
                     if LIVES <= 0:
                         LIVES = 4
+                        SOUND_GAME_OVER.play()
+                        pygame.mixer.music.stop()
                         self.next_state = TitleState()
     
   
@@ -236,6 +245,7 @@ class GameState(State):
     def render(self, screen):
         #clear screen
         screen.fill(BACKGROUND_COLOR)
+
         for asteroid in self.asteroids:
             asteroid.render()
 
@@ -244,6 +254,8 @@ class GameState(State):
 
         for building in self.buildings:
             building.render()
+
+       
         
 
 

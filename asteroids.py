@@ -6,24 +6,26 @@ import random
 #initialize pygame
 pygame.init()
 pygame.mixer.init()
+clock = pygame.time.Clock()
 
 #screen constants
 WIDTH,HEIGHT = 800,600
 BACKGROUND_COLOR = (0,0,0)
+SPEED_MULTIPLIER = 5
 
 #turret constants
 TURRET_RADIUS = 50
 TURRET_COLOR = (255,0,0)
 
 #bullet constants
-BULLET_SPEED = 0.5
+BULLET_SPEED = 1 * SPEED_MULTIPLIER
 BULLET_RADIUS = 2
 BULLET_COLOR = (0,0,255)
 BULLET_COOLDOWN = 50
 LAST_BULLET_TIME = pygame.time.get_ticks()
 
 #asteroid constants
-ASTEROID_SPEED = 0.25
+ASTEROID_SPEED = 0.1 * SPEED_MULTIPLIER
 ASTEROID_RADIUS = 10
 ASTEROID_COLOR = (0,255,0)
 ASTEROID_COOLDOWN = 500
@@ -125,8 +127,6 @@ class TitleState(State):
         super().__init__()
         pygame.mixer.music.load("audio/title.mp3")
         pygame.mixer.music.play(-1)
-        SCORE = 0
-        LIVES = 4
     
     def number(self):
         return 0
@@ -151,6 +151,8 @@ class TitleState(State):
 class GameState(State):
     def __init__(self):
         super().__init__()
+        SCORE = 0
+        LIVES = 4
         pygame.mixer.music.load("audio/theme.mp3")
         pygame.mixer.music.play(-1)
         pygame.time.delay(500)
@@ -165,7 +167,7 @@ class GameState(State):
         return 1
 
     def create_asteroid(self):
-            new_asteroid = Asteroid(random.uniform(0, WIDTH), 0, random.uniform(math.pi/4, 3*math.pi/4), random.uniform(ASTEROID_SPEED/2, 2*ASTEROID_SPEED), random.uniform(ASTEROID_RADIUS/2, 2*ASTEROID_RADIUS), ASTEROID_COLOR)
+            new_asteroid = Asteroid(random.uniform(0, WIDTH), 0, random.uniform(math.pi/4, 3*math.pi/4), ASTEROID_SPEED*random.uniform(0.5, 6), ASTEROID_RADIUS*random.uniform(0.5, 2), ASTEROID_COLOR)
             self.asteroids.append(new_asteroid)
 
     def update_asteroid(self):
@@ -229,6 +231,7 @@ class GameState(State):
                     SOUND_HIT.play()
                     SCORE += 10
 
+        for asteroid in self.asteroids:
             for building in self.buildings:
                 if self.check_collision(asteroid, building):
                     self.buildings.remove(building)
@@ -253,6 +256,22 @@ class GameState(State):
         for building in self.buildings:
             building.render()
 
+        #display score
+        font = pygame.font.Font(None, 36)
+        text_score = font.render(f'SCORE: {SCORE}', True, (255,0,0))
+        screen.blit(text_score, (10,10))
+
+        #display lives
+        font = pygame.font.Font(None, 36)
+        text_lives = font.render(f'LIVES: {LIVES}', True, (255,0,0))
+        screen.blit(text_lives, (WIDTH - text_lives.get_width() - 10,10))
+
+        #display fps
+        font = pygame.font.Font(None, 36)
+        fps = clock.get_fps()
+        text_fps = font.render(f'FPS: {fps:.0f}', True, (255,0,0))
+        screen.blit(text_fps, ((WIDTH // 2) - (text_fps.get_width() // 2), 10))
+
 #start game on title screen
 CURRENT_STATE = TitleState()
 
@@ -273,6 +292,9 @@ while not QUIT_GAME:
 
     #update display
     pygame.display.flip()
+
+    #limit to roughly 120 fps
+    clock.tick(120)
 
 #quit pygame
 pygame.quit()

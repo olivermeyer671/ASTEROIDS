@@ -21,10 +21,11 @@ SPEED_MULTIPLIER = (10 * FPS) // FPS
 
 #top score display color
 FONT_COLOR = (255,0,0)
+FONT_COLOR_TOP_SCORE = FONT_COLOR
 
 #turret constants
 TURRET_RADIUS = 20
-TURRET_HEIGHT = 50
+TURRET_HEIGHT = 2 * TURRET_RADIUS
 TURRET_COLOR = (255,0,0)
 
 #bullet constants
@@ -171,12 +172,12 @@ class TitleState(State):
 
         #display title
         font = pygame.font.Font(None, 72)
-        text = font.render("ASTEROIDS", True, (255,0,0))
+        text = font.render("ASTEROIDS", True, FONT_COLOR)
         screen.blit(text, ((WIDTH // 2) - (text.get_width() // 2), (HEIGHT // 2) - (text.get_height() // 2)))
 
         #display top score
         font = pygame.font.Font(None, 36)
-        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR)
+        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
         screen.blit(text_top_score, ((WIDTH // 2) - (text_top_score.get_width() // 2), 10))
 
 #game state
@@ -184,7 +185,7 @@ class GameState(State):
     def __init__(self):
         global FONT_COLOR, SCORE, LIVES
         super().__init__()
-        FONT_COLOR = (255,0,0)
+        FONT_COLOR_TOP_SCORE = FONT_COLOR
         SCORE = 0
         LIVES = 4
         pygame.mixer.music.load("audio/theme.mp3")
@@ -237,7 +238,7 @@ class GameState(State):
         return distance < self.c1.radius + self.c2.radius
 
     def update(self):
-        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE
 
         #update asteroids
         if pygame.time.get_ticks() - LAST_ASTEROID_TIME > ASTEROID_COOLDOWN:
@@ -266,7 +267,7 @@ class GameState(State):
                     SCORE += 10
                     if SCORE > TOP_SCORE:
                         TOP_SCORE = SCORE
-                        FONT_COLOR = (0,255,0)
+                        FONT_COLOR_TOP_SCORE = (0,255,0)
 
         for asteroid in self.asteroids:
             for building in self.buildings:
@@ -300,23 +301,23 @@ class GameState(State):
 
         #display score
         font = pygame.font.Font(None, 36)
-        text_score = font.render(f'SCORE: {SCORE}', True, (255,0,0))
+        text_score = font.render(f'SCORE: {SCORE}', True, FONT_COLOR)
         screen.blit(text_score, (10,10))
 
         #display lives
         font = pygame.font.Font(None, 36)
-        text_lives = font.render(f'LIVES: {LIVES}', True, (255,0,0))
+        text_lives = font.render(f'LIVES: {LIVES}', True, FONT_COLOR)
         screen.blit(text_lives, (WIDTH - text_lives.get_width() - 10,10))
 
         #display top score
         font = pygame.font.Font(None, 36)
-        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR)
+        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
         screen.blit(text_top_score, ((WIDTH // 2) - (text_top_score.get_width() // 2), 10))
 
         #display fps
         font = pygame.font.Font(None, 36)
         fps = clock.get_fps()
-        text_fps = font.render(f'FPS: {fps:.0f}', True, (255,0,0))
+        text_fps = font.render(f'FPS: {fps:.0f}', True, FONT_COLOR)
         screen.blit(text_fps, ((WIDTH // 2) - (text_fps.get_width() // 2), 10 + text_top_score.get_height() + 10))
 
 #start game on title screen

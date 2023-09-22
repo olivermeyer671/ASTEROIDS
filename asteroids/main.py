@@ -87,8 +87,8 @@ SOUND_MISSILE = pygame.mixer.Sound("audio/missile.wav")
 SOUND_HIT = pygame.mixer.Sound("audio/hit.wav")
 SOUND_EXPLOSION = pygame.mixer.Sound("audio/explosion.wav")
 SOUND_GAME_OVER = pygame.mixer.Sound("audio/gameover.wav")
-MUSIC_THEME = pygame.mixer.music.load("audio/theme.mp3")
-MUSIC_TITLE = pygame.mixer.music.load("audio/title.mp3")
+MUSIC_THEME = pygame.mixer.music.load("audio/theme.ogg")
+MUSIC_TITLE = pygame.mixer.music.load("audio/title.ogg")
 
 #audio mixing
 SOUND_BULLET.set_volume(0.3)

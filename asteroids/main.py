@@ -188,7 +188,7 @@ class TitleState(State):
 
     def __init__(self):
         super().__init__()
-        pygame.mixer.music.load("audio/title.mp3")
+        pygame.mixer.music.load("audio/title.ogg")
         pygame.mixer.music.play(-1)
 
     def handle_events(self):
@@ -225,7 +225,7 @@ class GameState(State):
         FONT_COLOR_TOP_SCORE = FONT_COLOR
         SCORE = 0
         LIVES = 4
-        pygame.mixer.music.load("audio/theme.mp3")
+        pygame.mixer.music.load("audio/theme.ogg")
         pygame.mixer.music.play(-1)
         pygame.time.delay(500)
         self.asteroids = []

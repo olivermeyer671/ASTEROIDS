@@ -17,7 +17,7 @@ WIDTH,HEIGHT = 800,600
 BACKGROUND_COLOR = (0,0,0)
 
 #fps limiter
-FPS = 120
+FPS = 90
 
 #master speed control
 SPEED_MULTIPLIER = (10 * FPS) // FPS
@@ -30,6 +30,7 @@ FONT_COLOR_TOP_SCORE = FONT_COLOR
 TURRET_RADIUS = 20
 TURRET_HEIGHT = 2 * TURRET_RADIUS
 TURRET_COLOR = (255,0,0)
+TURRET_SPEED = 0.3 * SPEED_MULTIPLIER
 
 #bullet constants
 BULLET_SPEED = 1 * SPEED_MULTIPLIER
@@ -57,8 +58,10 @@ BUILDING_COLOR = (255,0,0)
 BUILDING_RADIUS = 50
 
 #game data
-SCORE = 0
-LIVES = 4
+INITIAL_LIVES = 400
+INITIAL_SCORE = 0
+SCORE = INITIAL_SCORE
+LIVES = INITIAL_LIVES
 
 #data file
 DATA_FILE = "data.json"
@@ -107,6 +110,7 @@ class Bullet:
         self.speed = speed
         self.radius = radius
         self.color = color
+        self.mass = math.pi*self.radius*self.radius
 
     def update(self):
         self.x += BULLET_SPEED * math.cos(self.angle)
@@ -123,6 +127,7 @@ class Asteroid:
         self.angle = angle
         self.speed = speed
         self.radius = radius
+        self.mass = math.pi*self.radius*self.radius
         self.color = color
 
     def update(self):
@@ -167,6 +172,28 @@ class Building:
 
     def render(self):
         pygame.draw.circle(SCREEN, BUILDING_COLOR, (self.x, self.y), self.radius)
+
+#class for ship
+class Ship:
+    def __init__(self, x, y, speed, radius, color):
+        self.x = x
+        self.y = y
+        self.speed = speed
+        self.radius = radius
+        self.color = color
+
+    def update(self):
+        if ((pygame.key.get_pressed()[pygame.K_d] or pygame.key.get_pressed()[pygame.K_RIGHT]) and self.x < WIDTH - self.radius):
+            self.x += self.speed
+        if ((pygame.key.get_pressed()[pygame.K_a] or pygame.key.get_pressed()[pygame.K_LEFT]) and self.x > self.radius):
+            self.x -= self.speed
+        if ((pygame.key.get_pressed()[pygame.K_s] or pygame.key.get_pressed()[pygame.K_DOWN]) and self.y < HEIGHT - self.radius):
+            self.y += self.speed
+        if ((pygame.key.get_pressed()[pygame.K_w] or pygame.key.get_pressed()[pygame.K_UP]) and self.y > self.radius):
+            self.y -= self.speed
+
+    def render(self):
+        pygame.draw.circle(SCREEN, self.color, (self.x, self.y), self.radius)
 
 #state manager interface
 class State:
@@ -223,18 +250,17 @@ class GameState(State):
         global FONT_COLOR, SCORE, LIVES, FONT_COLOR_TOP_SCORE
         super().__init__()
         FONT_COLOR_TOP_SCORE = FONT_COLOR
-        SCORE = 0
-        LIVES = 4
+        SCORE = INITIAL_SCORE
+        LIVES = INITIAL_LIVES
         pygame.mixer.music.load("audio/theme.ogg")
         pygame.mixer.music.play(-1)
         pygame.time.delay(500)
         self.asteroids = []
         self.bullets = []
-        self.buildings = [Building(WIDTH//6, HEIGHT, BUILDING_RADIUS),
-                          Building(2*WIDTH//6, HEIGHT, BUILDING_RADIUS),
-                          Building(4*WIDTH//6, HEIGHT, BUILDING_RADIUS),
-                          Building(5*WIDTH//6, HEIGHT, BUILDING_RADIUS)]
+        self.buildings = []
+        #self.buildings = [Building(WIDTH//6, HEIGHT, BUILDING_RADIUS), Building(2*WIDTH//6, HEIGHT, BUILDING_RADIUS), Building(4*WIDTH//6, HEIGHT, BUILDING_RADIUS), Building(5*WIDTH//6, HEIGHT, BUILDING_RADIUS)]
         self.missiles = []
+        self.ships = [Ship(WIDTH//2, HEIGHT - TURRET_HEIGHT, TURRET_SPEED, TURRET_RADIUS, TURRET_COLOR)]
 
     def create_asteroid(self):
             new_asteroid = Asteroid(random.uniform(0, WIDTH), 0, random.uniform(math.pi/4, 3*math.pi/4), ASTEROID_SPEED*random.uniform(0.5, 6), ASTEROID_RADIUS*random.uniform(0.5, 2), ASTEROID_COLOR)
@@ -246,21 +272,21 @@ class GameState(State):
                 self.asteroids.remove(asteroid)
 
     #returns the current angle from the turret to the pointer
-    def bullet_angle(self):
+    def bullet_angle(self, ship):
         self.mouse_x, self.mouse_y = pygame.mouse.get_pos()
-        dx = self.mouse_x - WIDTH//2
-        dy = self.mouse_y - (HEIGHT - TURRET_HEIGHT)
+        dx = self.mouse_x - ship.x
+        dy = self.mouse_y - (ship.y - TURRET_HEIGHT)
         return math.atan2(dy,dx)
     
     #returns the starting coordinates of the bullet or missile on the turret circle
-    def bullet_coordinate(self, angle, radius):
-        x = WIDTH // 2 + int(radius * math.cos(angle))
-        y = (HEIGHT - TURRET_HEIGHT) + int(radius * math.sin(angle))
+    def bullet_coordinate(self, ship):
+        x = ship.x + int(ship.radius * math.cos(self.bullet_angle(self.ships[0])))
+        y = (ship.y) + int(ship.radius * math.sin(self.bullet_angle(self.ships[0])))
         return (x, y)
 
     def create_bullet(self):
-        bullet_position = self.bullet_coordinate(self.bullet_angle(), TURRET_RADIUS)
-        new_bullet = Bullet(bullet_position[0], bullet_position[1], self.bullet_angle(), BULLET_SPEED, BULLET_RADIUS, BULLET_COLOR)
+        bullet_position = self.bullet_coordinate(self.ships[0])
+        new_bullet = Bullet(bullet_position[0], bullet_position[1], self.bullet_angle(self.ships[0]), BULLET_SPEED, BULLET_RADIUS, BULLET_COLOR)
         self.bullets.append(new_bullet)
 
     def update_bullets(self):
@@ -269,8 +295,8 @@ class GameState(State):
                 self.bullets.remove(bullet)
 
     def create_missile(self, target_x, target_y, target_angle, target_speed):
-        missile_position = self.bullet_coordinate(self.bullet_angle(), TURRET_RADIUS)
-        new_missile = Missile(missile_position[0], missile_position[1], self.bullet_angle(), MISSILE_SPEED, MISSILE_RADIUS, MISSILE_COLOR, target_x, target_y, target_angle, target_speed)
+        missile_position = self.bullet_coordinate(self.ships[0])
+        new_missile = Missile(missile_position[0], missile_position[1], self.bullet_angle(self.ships[0]), MISSILE_SPEED, MISSILE_RADIUS, MISSILE_COLOR, target_x, target_y, target_angle, target_speed)
         self.missiles.append(new_missile)
 
     def update_missiles(self):
@@ -284,10 +310,41 @@ class GameState(State):
         self.c2 = c2
         distance = math.sqrt((self.c1.x - self.c2.x)**2 + (self.c1.y - self.c2.y)**2)
         return distance < self.c1.radius + self.c2.radius
+    
+    #elastic collision between two asteroids
+    def collision_between_asteroids(self, c1, c2):
+        distance = math.sqrt((c1.x - c2.x)**2 + (c1.y - c2.y)**2)
+        if (distance < c1.radius + c2.radius):
+
+            # calculate phi
+            phi = math.atan((c1.speed*math.sin(c1.angle) - c2.speed*math.sin(c2.angle)))/(c1.speed*math.cos(c1.angle) - c2.speed*math.cos(c2.angle))
+
+            #calculate v1x and v1y
+            v1x = ((c1.speed*math.cos(c1.angle - phi)*(c1.mass - c2.mass) + 2*c2.mass*c2.speed*math.cos(c2.angle - phi))/(c1.mass + c2.mass))*math.cos(phi) + c1.speed*math.sin(c1.angle - phi)*math.cos(phi + math.pi/2)
+            v1y = ((c1.speed*math.cos(c1.angle - phi)*(c1.mass - c2.mass) + 2*c2.mass*c2.speed*math.cos(c2.angle - phi))/(c1.mass + c2.mass))*math.sin(phi) + c1.speed*math.sin(c1.angle - phi)*math.sin(phi + math.pi/2)
+
+            #calculate v2x and v2y
+            v2x = ((c2.speed*math.cos(c2.angle - phi)*(c2.mass - c1.mass) + 2*c1.mass*c1.speed*math.cos(c1.angle - phi))/(c2.mass + c1.mass))*math.cos(phi) + c2.speed*math.sin(c2.angle - phi)*math.cos(phi + math.pi/2)
+            v2y = ((c2.speed*math.cos(c2.angle - phi)*(c2.mass - c1.mass) + 2*c1.mass*c1.speed*math.cos(c1.angle - phi))/(c2.mass + c1.mass))*math.sin(phi) + c2.speed*math.sin(c2.angle - phi)*math.sin(phi + math.pi/2)
+
+            #calculate new speed and angle for c1
+            c1.speed = math.sqrt(v1x*v1x + v1y*v1y)
+            c1.angle = math.atan2(v1y, v1x)
+
+            #calculate new speed and angle for c2
+            c2.speed = math.sqrt(v2x*v2x + v2y*v2y)
+            c2.angle = math.atan2(v2y, v2x)
+
+            #if collision happened, return true
+            return True
 
     #updates position of all items on screen, removes them if a collision is detected or they move off screen
     def update(self):
         global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LAST_MISSILE_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE
+
+        #update ships
+        for ship in self.ships:
+            ship.update()
 
         #update asteroids
         if pygame.time.get_ticks() - LAST_ASTEROID_TIME > ASTEROID_COOLDOWN:
@@ -316,6 +373,23 @@ class GameState(State):
         for missile in self.missiles:
             missile.update()
 
+        #check for collisions between asteroids
+        for asteroid1 in self.asteroids:
+            for asteroid2 in self.asteroids:
+                if (asteroid1 != asteroid2):
+                    self.collision_between_asteroids(asteroid1, asteroid2)
+
+        
+        #bullet and asteroid elastic collisions
+        for bullet in self.bullets:
+            for asteroid in self.asteroids:
+                if self.collision_between_asteroids(asteroid, bullet):
+                    SOUND_HIT.play()
+                    SCORE += 10
+                    if SCORE > TOP_SCORE:
+                        TOP_SCORE = SCORE
+                        FONT_COLOR_TOP_SCORE = (0,255,0)
+        """
         #check for collisions between asteroids and bullets, update stats
         for bullet in self.bullets:
             for asteroid in self.asteroids:
@@ -329,7 +403,7 @@ class GameState(State):
                     if SCORE > TOP_SCORE:
                         TOP_SCORE = SCORE
                         FONT_COLOR_TOP_SCORE = (0,255,0)
-
+        """
         #check for collisions between asteroids and buildings, update stats
         for asteroid in self.asteroids:
             for building in self.buildings:
@@ -360,6 +434,22 @@ class GameState(State):
                         TOP_SCORE = SCORE
                         FONT_COLOR_TOP_SCORE = (0,255,0)
 
+        #check for collisions between asteroids and ship, update stats
+        for asteroid in self.asteroids:
+            for ship in self.ships:
+                if self.check_collision(asteroid, ship):
+                    if asteroid in self.asteroids:
+                        self.asteroids.remove(asteroid)
+                    LIVES -= 1
+                    SOUND_EXPLOSION.play()
+                    if LIVES <= 0:
+                        if ship in self.ships:
+                            self.ships.remove(ship)
+                        LIVES = 4
+                        save_data()
+                        SOUND_GAME_OVER.play()
+                        self.next_state = TitleState()
+
     #renders all necessary gameplay items on screen
     def render(self, screen):
         #clear screen
@@ -377,9 +467,12 @@ class GameState(State):
         for missile in self.missiles:
             missile.render()
 
+        for ship in self.ships:
+            ship.render()
+
         #display the turret
-        pygame.draw.circle(screen, TURRET_COLOR, (WIDTH // 2, HEIGHT - TURRET_HEIGHT), TURRET_RADIUS)
-        pygame.draw.line(screen, TURRET_COLOR, (WIDTH // 2, HEIGHT), (WIDTH // 2, HEIGHT - TURRET_HEIGHT), TURRET_RADIUS)
+        #pygame.draw.circle(screen, TURRET_COLOR, (WIDTH // 2, HEIGHT - TURRET_HEIGHT), TURRET_RADIUS)
+        #pygame.draw.line(screen, TURRET_COLOR, (WIDTH // 2, HEIGHT), (WIDTH // 2, HEIGHT - TURRET_HEIGHT), TURRET_RADIUS)
 
         #display score
         font = pygame.font.Font(None, 36)

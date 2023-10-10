@@ -16,7 +16,7 @@ WIDTH,HEIGHT = 800,600
 BACKGROUND_COLOR = (0,0,0)
 
 #fps limiter
-FPS = 30
+FPS = 90
 
 #master speed control
 SPEED_MULTIPLIER = (10 * FPS) // FPS
@@ -57,8 +57,10 @@ BUILDING_COLOR = (255,0,0)
 BUILDING_RADIUS = 50
 
 #game data
-SCORE = 0
-LIVES = 4
+INITIAL_LIVES = 400
+INITIAL_SCORE = 0
+SCORE = INITIAL_SCORE
+LIVES = INITIAL_LIVES
 
 #data file
 DATA_FILE = "data.json"
@@ -107,6 +109,7 @@ class Bullet:
         self.speed = speed
         self.radius = radius
         self.color = color
+        self.mass = math.pi*self.radius*self.radius
 
     def update(self):
         self.x += BULLET_SPEED * math.cos(self.angle)
@@ -123,6 +126,7 @@ class Asteroid:
         self.angle = angle
         self.speed = speed
         self.radius = radius
+        self.mass = math.pi*self.radius*self.radius
         self.color = color
 
     def update(self):
@@ -245,8 +249,8 @@ class GameState(State):
         global FONT_COLOR, SCORE, LIVES, FONT_COLOR_TOP_SCORE
         super().__init__()
         FONT_COLOR_TOP_SCORE = FONT_COLOR
-        SCORE = 0
-        LIVES = 4
+        SCORE = INITIAL_SCORE
+        LIVES = INITIAL_LIVES
         pygame.mixer.music.load("asteroids/audio/theme.ogg")
         pygame.mixer.music.play(-1)
         pygame.time.delay(500)
@@ -305,6 +309,33 @@ class GameState(State):
         self.c2 = c2
         distance = math.sqrt((self.c1.x - self.c2.x)**2 + (self.c1.y - self.c2.y)**2)
         return distance < self.c1.radius + self.c2.radius
+    
+    #elastic collision between two asteroids
+    def collision_between_asteroids(self, c1, c2):
+        distance = math.sqrt((c1.x - c2.x)**2 + (c1.y - c2.y)**2)
+        if (distance < c1.radius + c2.radius):
+
+            # calculate phi
+            phi = math.atan((c1.speed*math.sin(c1.angle) - c2.speed*math.sin(c2.angle)))/(c1.speed*math.cos(c1.angle) - c2.speed*math.cos(c2.angle))
+
+            #calculate v1x and v1y
+            v1x = ((c1.speed*math.cos(c1.angle - phi)*(c1.mass - c2.mass) + 2*c2.mass*c2.speed*math.cos(c2.angle - phi))/(c1.mass + c2.mass))*math.cos(phi) + c1.speed*math.sin(c1.angle - phi)*math.cos(phi + math.pi/2)
+            v1y = ((c1.speed*math.cos(c1.angle - phi)*(c1.mass - c2.mass) + 2*c2.mass*c2.speed*math.cos(c2.angle - phi))/(c1.mass + c2.mass))*math.sin(phi) + c1.speed*math.sin(c1.angle - phi)*math.sin(phi + math.pi/2)
+
+            #calculate v2x and v2y
+            v2x = ((c2.speed*math.cos(c2.angle - phi)*(c2.mass - c1.mass) + 2*c1.mass*c1.speed*math.cos(c1.angle - phi))/(c2.mass + c1.mass))*math.cos(phi) + c2.speed*math.sin(c2.angle - phi)*math.cos(phi + math.pi/2)
+            v2y = ((c2.speed*math.cos(c2.angle - phi)*(c2.mass - c1.mass) + 2*c1.mass*c1.speed*math.cos(c1.angle - phi))/(c2.mass + c1.mass))*math.sin(phi) + c2.speed*math.sin(c2.angle - phi)*math.sin(phi + math.pi/2)
+
+            #calculate new speed and angle for c1
+            c1.speed = math.sqrt(v1x*v1x + v1y*v1y)
+            c1.angle = math.atan2(v1y, v1x)
+
+            #calculate new speed and angle for c2
+            c2.speed = math.sqrt(v2x*v2x + v2y*v2y)
+            c2.angle = math.atan2(v2y, v2x)
+
+            #if collision happened, return true
+            return True
 
     #updates position of all items on screen, removes them if a collision is detected or they move off screen
     def update(self):
@@ -341,6 +372,23 @@ class GameState(State):
         for missile in self.missiles:
             missile.update()
 
+        #check for collisions between asteroids
+        for asteroid1 in self.asteroids:
+            for asteroid2 in self.asteroids:
+                if (asteroid1 != asteroid2):
+                    self.collision_between_asteroids(asteroid1, asteroid2)
+
+        
+        #bullet and asteroid elastic collisions
+        for bullet in self.bullets:
+            for asteroid in self.asteroids:
+                if self.collision_between_asteroids(asteroid, bullet):
+                    SOUND_HIT.play()
+                    SCORE += 10
+                    if SCORE > TOP_SCORE:
+                        TOP_SCORE = SCORE
+                        FONT_COLOR_TOP_SCORE = (0,255,0)
+        """
         #check for collisions between asteroids and bullets, update stats
         for bullet in self.bullets:
             for asteroid in self.asteroids:
@@ -354,7 +402,7 @@ class GameState(State):
                     if SCORE > TOP_SCORE:
                         TOP_SCORE = SCORE
                         FONT_COLOR_TOP_SCORE = (0,255,0)
-
+        """
         #check for collisions between asteroids and buildings, update stats
         for asteroid in self.asteroids:
             for building in self.buildings:

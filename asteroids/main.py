@@ -393,6 +393,10 @@ QUIT_GAME = False
 async def main():
     global CURRENT_STATE
     while True:
+
+        #limit to the fps constant
+        DELTA = clock.tick(FPS) / 1000
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 QUIT_GAME = True
@@ -406,14 +410,12 @@ async def main():
             CURRENT_STATE = CURRENT_STATE.next_state
         
         #update and render the current state
-        CURRENT_STATE.update()
+        CURRENT_STATE.update(DELTA)
         CURRENT_STATE.render(SCREEN)
 
         #update display
         pygame.display.update()
 
-        #limit to the fps constant
-        clock.tick(FPS)
         await asyncio.sleep(0)
 
 asyncio.run(main())

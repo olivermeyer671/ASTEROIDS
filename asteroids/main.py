@@ -12,9 +12,9 @@ pygame.mixer.init()
 clock = pygame.time.Clock()
 
 #screen constants
-#WIDTH = pygame.display.Info().current_w
-#HEIGHT = pygame.display.Info().current_h - 60
-WIDTH,HEIGHT = 800,600
+WIDTH = pygame.display.Info().current_w
+HEIGHT = pygame.display.Info().current_h - 60
+#WIDTH,HEIGHT = 800,600
 BACKGROUND_COLOR = (0,0,0)
 
 #fps limiter
@@ -337,7 +337,11 @@ class GameState(State):
             for p2 in self.bullets:
                 if p1 != p2:
                     if self.elastic_collision(p1,p2):
+                        SOUND_HIT.play()
                         SCORE += 10
+                        if SCORE > TOP_SCORE:
+                            TOP_SCORE = SCORE
+                            FONT_COLOR_TOP_SCORE = (0,255,0)
 
             
 

@@ -12,9 +12,9 @@ pygame.mixer.init()
 clock = pygame.time.Clock()
 
 #screen constants
-WIDTH = pygame.display.Info().current_w
-HEIGHT = pygame.display.Info().current_h - 60
-#WIDTH,HEIGHT = 800,600
+#WIDTH = pygame.display.Info().current_w
+#HEIGHT = pygame.display.Info().current_h - 60
+WIDTH,HEIGHT = 800,600
 BACKGROUND_COLOR = (0,0,0)
 
 #fps limiter

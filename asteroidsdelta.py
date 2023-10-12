@@ -47,9 +47,17 @@ BULLET_DENSITY = 10000
 ASTEROID_SPEED = 100 #pixels per second
 ASTEROID_RADIUS = 10
 ASTEROID_COLOR = (0,255,0)
-ASTEROID_COOLDOWN = 250
+ASTEROID_COOLDOWN = 800
 LAST_ASTEROID_TIME = pygame.time.get_ticks()
 ASTEROID_DENSITY = 100
+
+#clump constants
+LAST_CLUMP_TIME = pygame.time.get_ticks()
+CLUMP_COOLDOWN = 1500
+CLUMP_SPEED = 50
+CLUMP_RADIUS = 20
+CLUMP_DENSITY = 100
+CLUMP_COLOR = (212,175,55)
 
 #missile constants
 MISSILE_SPEED = 1 * SPEED_MULTIPLIER
@@ -118,24 +126,114 @@ class Particle:
         self.color = color
         self.mass = math.pi*self.radius*self.radius*density
 
-    def apply_force(self, force):
-        self.force[0] += force[0]
-        self.force[1] += force[1]
+    def apply_force(self, force_0, force_1):
+        self.force[0] += force_0
+        self.force[1] += force_1
+
+    def is_invisible(self):
+        if (self.position[0] < 0 or self.position[0] > WIDTH or self.position[1] < 0 or self.position[1] > HEIGHT):
+            return True
+        else:
+            return False
 
     def update(self, DELTA):
         #update acceleration
         self.acceleration = (self.acceleration[0] + self.force[0] / self.mass, self.acceleration[1] + self.force[1] / self.mass)
+        #self.acceleration = (self.force[0] / self.mass, self.force[1] / self.mass)
+        
 
-        self.force = [0, 0]
-
+        
         #update velocity
         self.velocity = (self.velocity[0] + self.acceleration[0]*DELTA, self.velocity[1] + self.acceleration[1]*DELTA)
 
         #update position
         self.position = (self.position[0] + self.velocity[0]*DELTA, self.position[1] + self.velocity[1]*DELTA)
+
+        self.force = [0, 0]
         
     def render(self):
         pygame.draw.circle(SCREEN, self.color, (self.position[0], self.position[1]), self.radius)
+
+
+#class for tethers
+class Tether:
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+        self.distance = np.linalg.norm(np.array(end.position) - np.array(start.position))
+        self.color = (255,255,255)
+
+    def update(self, DELTA):
+        if np.linalg.norm(np.array(self.end.position) - np.array(self.start.position)) >= self.distance:
+            self.apply_forces()
+
+    def apply_forces(self):
+        # Calculate the forces on the start and end circles based on the tension in the tether
+        m1 = self.start.mass  # Mass of the start circle
+        m2 = self.end.mass  # Mass of the end circle
+
+        # Calculate the acceleration components due to tension
+        # Tension_x = m1 * a1_x
+        a1_x = (self.distance * (self.end.position[0] - self.start.position[0])) / (self.distance * (m1 + m2))
+
+        # Tension_y = m1 * a1_y
+        a1_y = (self.distance * (self.end.position[1] - self.start.position[1])) / (self.distance * (m1 + m2))
+
+        # Tension_x = m2 * a2_x
+        a2_x = (self.distance * (self.start.position[0] - self.end.position[0])) / (self.distance * (m1 + m2))
+
+        # Tension_y = m2 * a2_y
+        a2_y = (self.distance * (self.start.position[1] - self.end.position[1])) / (self.distance * (m1 + m2))
+
+        # Calculate the forces based on the calculated accelerations
+        force_start_x = m1 * a1_x
+        force_start_y = m1 * a1_y
+        force_end_x = m2 * a2_x
+        force_end_y = m2 * a2_y
+
+        # Apply these forces to the circles
+        self.start.apply_force(force_start_x, force_start_y)
+        self.end.apply_force(force_end_x, force_end_y)
+
+    def render(self):
+        pygame.draw.aaline(SCREEN, self.color, self.start.position, self.end.position)
+
+#class for clumps
+class Clump:
+    def __init__(self, position, velocity, acceleration, radius, density, color, count):
+        self.position = position
+        self.velocity = velocity
+        self.acceleration = acceleration
+        self.radius = radius
+        self.density = density
+        self.color = color
+        self.init_clump = []
+        self.count = count
+        self.clump = self.recursive_clump(self.init_clump, self.count)
+        self.mass = len(self.clump) * self.density * math.pi * self.radius * self.radius
+        self.box = Particle(position, velocity, acceleration, radius, density, color)
+
+    def recursive_clump(self, clump, count):
+            position = np.array([self.position[0] + random.uniform(-self.radius, self.radius), self.position[1] + random.uniform(-self.radius, self.radius)])
+            if(len(clump) < count):
+                clump.append(Particle(position, self.velocity, self.acceleration, self.radius, self.density, self.color))
+                return self.recursive_clump(clump, count)
+            else:
+                return clump
+
+    def update(self, DELTA):
+        self.mass = len(self.clump) * self.density * math.pi * self.radius * self.radius + 0.1 #minimum mass to prevent error in particle update
+        for particle in self.clump:
+            particle.velocity = self.velocity
+            particle.mass = self.mass
+            particle.update(DELTA)
+        self.box.velocity = self.velocity
+        self.box.mass = self.mass
+        self.box.update(DELTA)
+        
+    def render(self):
+        for particle in self.clump:
+            particle.render()
 
 #state manager interface
 class State:
@@ -163,6 +261,8 @@ class TitleState(State):
     def handle_events(self):
         if pygame.key.get_pressed()[pygame.K_SPACE]:
             self.next_state = GameState()
+        if pygame.key.get_pressed()[pygame.K_m]:
+            self.next_state = MenuState()
 
     def update(self, DELTA):
         pass
@@ -178,7 +278,42 @@ class TitleState(State):
 
         #display press spacebar
         font = pygame.font.Font(None, 18)
-        text_prompt = font.render("press space", True, FONT_COLOR)
+        text_prompt = font.render("press space to play, m for menu", True, FONT_COLOR)
+        screen.blit(text_prompt, ((WIDTH // 2) - (text_prompt.get_width() // 2), (HEIGHT // 2) - (text_prompt.get_height() // 2) + (text.get_height() // 2) + 10))
+
+        #display top score
+        font = pygame.font.Font(None, 36)
+        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
+        screen.blit(text_top_score, ((WIDTH // 2) - (text_top_score.get_width() // 2), 10))
+
+#menu state
+class MenuState(State):
+    global SCORE, LIVES
+
+    def __init__(self):
+        super().__init__()
+        pygame.mixer.music.load("asteroids/audio/title.ogg")
+        pygame.mixer.music.play(-1)
+
+    def handle_events(self):
+        if pygame.key.get_pressed()[pygame.K_ESCAPE]:
+            self.next_state = TitleState()
+
+    def update(self, DELTA):
+        pass
+
+    def render(self, screen):
+        #clear screen
+        screen.fill(BACKGROUND_COLOR)
+
+        #display title
+        font = pygame.font.Font(None, 72)
+        text = font.render("MENU", True, FONT_COLOR)
+        screen.blit(text, ((WIDTH // 2) - (text.get_width() // 2), (HEIGHT // 2) - (text.get_height() // 2)))
+
+        #display press spacebar
+        font = pygame.font.Font(None, 18)
+        text_prompt = font.render("press escape for titlescreen", True, FONT_COLOR)
         screen.blit(text_prompt, ((WIDTH // 2) - (text_prompt.get_width() // 2), (HEIGHT // 2) - (text_prompt.get_height() // 2) + (text.get_height() // 2) + 10))
 
         #display top score
@@ -198,9 +333,15 @@ class GameState(State):
         pygame.mixer.music.play(-1)
         pygame.time.delay(500)
         self.asteroids = []
-        self.ships = [Particle((WIDTH / 2, HEIGHT / 2), (0, 0), (0, 0), TURRET_RADIUS, SHIP_DENSITY, TURRET_COLOR)]
+        self.ships = [Particle((WIDTH / 2, 2 * HEIGHT / 3), (0, 0), (0, 0), TURRET_RADIUS, SHIP_DENSITY, TURRET_COLOR)]
         self.bullets = []
+        self.clumps = []
+        self.tethers = []
         
+
+    def handle_events(self):
+        if pygame.key.get_pressed()[pygame.K_ESCAPE]:
+            self.next_state = TitleState()
 
     def create_asteroid(self):
         #random initial particle state
@@ -221,13 +362,15 @@ class GameState(State):
         self.asteroids.append(new_asteroid)
 
     def create_bullet(self):
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        direction = np.array((mouse_x - self.ships[0].position[0], mouse_y - self.ships[0].position[1]))
-        magnitude = np.linalg.norm(direction)
-        unit_direction = direction / magnitude
+        if self.ships and len(self.ships) > 0:
+            
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            direction = np.array((mouse_x - self.ships[0].position[0], mouse_y - self.ships[0].position[1]))
+            magnitude = np.linalg.norm(direction)
+            unit_direction = direction / magnitude
 
-        new_bullet = Particle(self.ships[0].position, unit_direction * BULLET_SPEED, [0,0], BULLET_RADIUS, BULLET_DENSITY, BUILDING_COLOR)
-        self.bullets.append(new_bullet)
+            new_bullet = Particle(self.ships[0].position, unit_direction * BULLET_SPEED, [0,0], BULLET_RADIUS, BULLET_DENSITY, BUILDING_COLOR)
+            self.bullets.append(new_bullet)
 
     def elastic_collision(self, p1, p2):
         v1 = np.array(p1.velocity)
@@ -256,10 +399,12 @@ class GameState(State):
             p2.position = x2 + separation
 
             return True
+        else:
+            return False
 
     #updates position of all items on screen, removes them if a collision is detected or they move off screen
     def update(self, DELTA):
-        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LAST_MISSILE_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LAST_MISSILE_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR
 
         #create asteroids
         if pygame.time.get_ticks() - LAST_ASTEROID_TIME > ASTEROID_COOLDOWN:
@@ -269,10 +414,10 @@ class GameState(State):
         #update asteroids
         for asteroid in self.asteroids:
             asteroid.update(DELTA)
-            if (asteroid.position[0] < 0 or asteroid.position[0] > WIDTH or asteroid.position[1] < 0 or asteroid.position[1] > HEIGHT):
+            if (asteroid.is_invisible()):
                 self.asteroids.remove(asteroid)
 
-        ASTEROID_COLOR = (random.uniform(0,255), random.uniform(10,255), random.uniform(0,255))
+        #CLUMP_COLOR = (random.uniform(0,255), random.uniform(10,255), random.uniform(0,255))
 
         #asteroid collisions
         for p1 in self.asteroids:
@@ -283,8 +428,9 @@ class GameState(State):
 
         #update ships
         for ship in self.ships:
+            #ship.apply_force(-1*ship.velocity[0], -1*ship.velocity[1])
             ship.update(DELTA)
-            if (ship.position[0] < 0 or ship.position[0] > WIDTH or ship.position[1] < 0 or ship.position[1] > HEIGHT):
+            if (ship.is_invisible()):
                 if ship in self.ships:
                     self.ships.remove(ship)
             if (ship.position[0] <= ship.radius and ship.velocity[0] <= 0) or (ship.position[0] >= WIDTH - ship.radius and ship.velocity[0] >= 0):
@@ -304,6 +450,7 @@ class GameState(State):
             if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
                 ship.velocity = ((min(ship.velocity[0] + FORCE, MAX_SHIP_SPEED), ship.velocity[1]))
             
+
         #ship collisions
         for p1 in self.asteroids:
             for p2 in self.ships:
@@ -327,19 +474,114 @@ class GameState(State):
             SOUND_BULLET.play()
         for bullet in self.bullets:
             bullet.update(DELTA)
-            if (bullet.position[0] < 0 or bullet.position[0] > WIDTH or bullet.position[1] < 0 or bullet.position[1] > HEIGHT):
+            if (bullet.is_invisible()):
                 if bullet in self.bullets:
                     self.bullets.remove(bullet)
 
+        
+        #create tethers
+        if pygame.mouse.get_pressed()[2]:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            for clump in self.clumps:
+                for circle in clump.clump:
+                    distance = np.linalg.norm(np.array(circle.position) - np.array((mouse_x, mouse_y)))
+                    if distance <= circle.radius:
+                        if self.ships:  # Check if there are any ships
+                            self.tethers.append(Tether(self.ships[0], circle))
+
+        #create all tethers
+        if pygame.mouse.get_pressed()[1]:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            for clump in self.clumps:
+                for circle in clump.clump:
+                    if self.ships:  # Check if there are any ships
+                        self.tethers.append(Tether(self.ships[0], circle))
+
+        #update tethers
+        for tether in self.tethers:
+            tether.update(DELTA)
+            present = False
+            for clump in self.clumps:
+                for particle in clump.clump:
+                    if (tether.end in clump.clump):
+                        present = True
+            if not present:
+                self.tethers.remove(tether)
+                
+
         #bullet collisions
-        for p1 in self.asteroids:
-            for p2 in self.bullets:
-                if p1 != p2:
-                    if self.elastic_collision(p1,p2):
-                        SCORE += 10
+        for asteroid in self.asteroids:
+            for bullet in self.bullets:
+                if asteroid != bullet:
+                    self.elastic_collision(asteroid,bullet)
+                        
 
-            
+        #create clumps
+        if pygame.time.get_ticks() - LAST_CLUMP_TIME > CLUMP_COOLDOWN:
+            LAST_CLUMP_TIME = pygame.time.get_ticks()
 
+            position = np.array([random.uniform(0, WIDTH), 0])
+            angle = random.uniform(math.pi/4, 3*math.pi/4)
+            speed = CLUMP_SPEED*random.uniform(0.5, 6)
+            velocity = np.array([speed * math.cos(angle), speed * math.sin(angle)])
+            #acceleration = np.array([random.uniform(-100, 100),random.uniform(-100, 100)])
+            acceleration = np.array([0,0])
+            radius = CLUMP_RADIUS*random.uniform(0.5, 2)
+            density = CLUMP_DENSITY
+            color = CLUMP_COLOR
+
+            self.clumps.append(Clump(position, velocity, acceleration, radius, density, color, 10))
+
+        #update clumps
+        for clump in self.clumps:
+            clump.update(DELTA)
+            for particle in clump.clump:
+                if (particle.is_invisible()):
+                        if particle in clump.clump:
+                            clump.clump.remove(particle)
+
+        #clump on asteroids and ship collisions
+        for list in [self.asteroids, self.ships]:
+            for p1 in list:
+                for clump in self.clumps:
+                    for p2 in clump.clump:
+                        if p1 != p2:
+                            if self.elastic_collision(p1,p2):
+                                clump.velocity = p2.velocity
+
+        #clump on bullet collision
+        for p1 in self.bullets:
+                for clump in self.clumps:
+                    for p2 in clump.clump:
+                        if p1 != p2:
+                            if self.elastic_collision(p1,p2):
+                                clump.velocity = p2.velocity
+                                if p2 in clump.clump:
+                                    clump.clump.remove(p2)
+                                SCORE += 10
+
+        #clump on clump collision simplified
+        for clump1 in self.clumps:
+            for clump2 in self.clumps:
+                if clump1 != clump2:
+                    p1 = clump1.box
+                    p2 = clump2.box
+                    if p1 != p2:
+                        if self.elastic_collision(p1,p2):
+                            clump1.velocity = p1.velocity
+                            clump2.velocity = p2.velocity
+
+        '''
+        #clump on clump collisions (needs pruning step to be functionally efficient)
+        for clump1 in self.clumps:
+            for clump2 in self.clumps:
+                for p1 in clump1.clump:
+                    for p2 in clump2.clump:
+                        if p1 != p2:
+                            if self.elastic_collision(p1,p2):
+                                clump1.velocity = p1.velocity
+                                clump2.velocity = p2.velocity
+        '''                  
 
     #renders all necessary gameplay items on screen
     def render(self, screen):
@@ -349,11 +591,18 @@ class GameState(State):
         for asteroid in self.asteroids:
             asteroid.render()
 
+        for tether in self.tethers:
+            tether.render()
+
         for ship in self.ships:
             ship.render()
 
         for bullet in self.bullets:
-            bullet.render()
+            bullet.render() 
+
+        for clump in self.clumps:
+            clump.render()
+        
 
         #display score
         font = pygame.font.Font(None, 36)
@@ -397,9 +646,7 @@ while not QUIT_GAME:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             QUIT_GAME = True
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                QUIT_GAME = True
+      
 
     #handle events and state transitions
     CURRENT_STATE.handle_events()

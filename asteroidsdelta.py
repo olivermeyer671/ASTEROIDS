@@ -59,7 +59,7 @@ CLUMP_SPEED = 50
 CLUMP_RADIUS = 20
 CLUMP_DENSITY = 100
 CLUMP_COLOR = (212,175,55)
-CLUMP_COUNT = 10
+CLUMP_COUNT = 20
 
 #missile constants
 MISSILE_SPEED = 1 * SPEED_MULTIPLIER
@@ -235,6 +235,8 @@ class Clump:
             particle.velocity = self.velocity
             particle.mass = self.mass
             particle.update(DELTA)
+            if particle.is_invisible() and particle in self.clump:
+                self.clump.remove(particle)
         self.box.velocity = self.velocity
         self.box.mass = self.mass
         self.box.update(DELTA)
@@ -590,6 +592,8 @@ class GameState(State):
                 if (particle.is_invisible()):
                         if particle in clump.clump:
                             clump.clump.remove(particle)
+            if len(clump.clump) <= 0:
+                self.clumps.remove(clump)
 
         #clump on asteroids and ship collisions
         for list in [self.asteroids, self.ships]:

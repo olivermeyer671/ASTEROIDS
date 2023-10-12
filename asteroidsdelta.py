@@ -59,6 +59,7 @@ CLUMP_SPEED = 50
 CLUMP_RADIUS = 20
 CLUMP_DENSITY = 100
 CLUMP_COLOR = (212,175,55)
+CLUMP_COUNT = 10
 
 #missile constants
 MISSILE_SPEED = 1 * SPEED_MULTIPLIER
@@ -90,16 +91,17 @@ def load_data():
             data = json.load(file)
             top_score = data.get("TOP_SCORE", 0)
             gold = data.get("GOLD", 0)
-            return top_score, gold
+            tethers = data.get("TETHERS", 0)
+            return top_score, gold, tethers
     except FileNotFoundError:
-        return 0, 0
+        return 0, 0, 0
     
 #top score
-TOP_SCORE, GOLD = load_data()
+TOP_SCORE, GOLD, TETHERS = load_data()
 
 #save data to file
 def save_data():
-    data = {"TOP_SCORE": TOP_SCORE, "GOLD": GOLD}
+    data = {"TOP_SCORE": TOP_SCORE, "GOLD": GOLD, "TETHERS": TETHERS}
     with open(DATA_FILE, "w") as file:
         json.dump(data, file)
 
@@ -294,19 +296,28 @@ class TitleState(State):
 
 #menu state
 class MenuState(State):
-    global SCORE, LIVES
+    global SCORE, LIVES, GOLD, TETHERS
 
     def __init__(self):
         super().__init__()
         pygame.mixer.music.load("asteroids/audio/title.ogg")
         pygame.mixer.music.play(-1)
+        self.key_1_pressed = False
 
     def handle_events(self):
         if pygame.key.get_pressed()[pygame.K_ESCAPE]:
             self.next_state = TitleState()
 
     def update(self, DELTA):
-        pass
+        global GOLD, TETHERS
+        pressed_1 = pygame.key.get_pressed()[pygame.K_1]
+        if pressed_1 and not self.key_1_pressed:
+            if GOLD >= 1:
+                GOLD -= 1
+                TETHERS += 1
+            self.key_1_pressed = True
+        elif not pressed_1:
+            self.key_1_pressed = False
 
     def render(self, screen):
         #clear screen
@@ -327,6 +338,21 @@ class MenuState(State):
         text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
         screen.blit(text_top_score, ((WIDTH // 2) - (text_top_score.get_width() // 2), 10))
 
+        #display score
+        font = pygame.font.Font(None, 36)
+        text_score = font.render(f'SCORE: {SCORE}', True, FONT_COLOR)
+        #screen.blit(text_score, (10,10))
+
+        #display gold
+        font = pygame.font.Font(None, 36)
+        text_gold = font.render(f'GOLD: {GOLD}', True, FONT_COLOR)
+        screen.blit(text_gold, (10,10 + text_score.get_height() + 10))
+
+        #display tethers
+        font = pygame.font.Font(None, 36)
+        text_tethers = font.render(f'Tethers: {TETHERS} (to buy more press 1)', True, FONT_COLOR)
+        screen.blit(text_tethers, (10,10 + text_score.get_height() + 10 + text_gold.get_height() + 10))
+
 #game state
 class GameState(State):
     def __init__(self):
@@ -343,6 +369,7 @@ class GameState(State):
         self.bullets = []
         self.clumps = []
         self.tethers = []
+        self.tethered_pairs = set()
         
 
     def handle_events(self):
@@ -410,7 +437,7 @@ class GameState(State):
 
     #updates position of all items on screen, removes them if a collision is detected or they move off screen
     def update(self, DELTA):
-        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LAST_MISSILE_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR, GOLD, LAST_SCORE_TIME, FONT_COLOR_NEW_TOP_SCORE
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LAST_MISSILE_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR, GOLD, LAST_SCORE_TIME, FONT_COLOR_NEW_TOP_SCORE, TETHERS
 
         #update the score
         current_time = pygame.time.get_ticks()
@@ -502,7 +529,12 @@ class GameState(State):
                     distance = np.linalg.norm(np.array(circle.position) - np.array((mouse_x, mouse_y)))
                     if distance <= circle.radius:
                         if self.ships:  # Check if there are any ships
-                            self.tethers.append(Tether(self.ships[0], circle))
+                            if (self.ships[0], circle) not in self.tethered_pairs:
+                                if (TETHERS > 0):
+                                    TETHERS -= 1
+                                    self.tethered_pairs.add((self.ships[0], circle))
+                                    self.tethers.append(Tether(self.ships[0], circle))
+                            
 
         #create all tethers
         if pygame.mouse.get_pressed()[1]:
@@ -510,7 +542,11 @@ class GameState(State):
             for clump in self.clumps:
                 for circle in clump.clump:
                     if self.ships:  # Check if there are any ships
-                        self.tethers.append(Tether(self.ships[0], circle))
+                        if (self.ships[0], circle) not in self.tethered_pairs:
+                                if (TETHERS > 0):
+                                    TETHERS -= 1
+                                    self.tethered_pairs.add((self.ships[0], circle))
+                                    self.tethers.append(Tether(self.ships[0], circle))
 
         #update tethers
         for tether in self.tethers:
@@ -545,7 +581,7 @@ class GameState(State):
             density = CLUMP_DENSITY
             color = CLUMP_COLOR
 
-            self.clumps.append(Clump(position, velocity, acceleration, radius, density, color, 10))
+            self.clumps.append(Clump(position, velocity, acceleration, radius, density, color, CLUMP_COUNT))
 
         #update clumps
         for clump in self.clumps:
@@ -637,6 +673,11 @@ class GameState(State):
         text_gold = font.render(f'GOLD: {GOLD}', True, FONT_COLOR)
         screen.blit(text_gold, (10,10 + text_score.get_height() + 10))
 
+        #display tethers
+        font = pygame.font.Font(None, 36)
+        text_tethers = font.render(f'Tethers: {TETHERS}', True, FONT_COLOR)
+        screen.blit(text_tethers, (10,10 + text_score.get_height() + 10 + text_gold.get_height() + 10))
+
         #display lives
         font = pygame.font.Font(None, 36)
         text_lives = font.render(f'LIVES: {LIVES}', True, FONT_COLOR)
@@ -667,12 +708,14 @@ while not QUIT_GAME:
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
+            save_data()
             QUIT_GAME = True
       
 
     #handle events and state transitions
     CURRENT_STATE.handle_events()
     if CURRENT_STATE.next_state:
+        save_data()
         CURRENT_STATE = CURRENT_STATE.next_state
     
     #update and render the current state

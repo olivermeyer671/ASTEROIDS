@@ -25,6 +25,7 @@ SPEED_MULTIPLIER = (10 * FPS) // FPS
 #top score display color
 FONT_COLOR = (255,0,0)
 FONT_COLOR_TOP_SCORE = FONT_COLOR
+FONT_COLOR_NEW_TOP_SCORE = (0,255,0)
 
 #ship constants
 TURRET_RADIUS = 20
@@ -76,6 +77,9 @@ INITIAL_SCORE = 0
 SCORE = INITIAL_SCORE
 LIVES = INITIAL_LIVES
 
+#update score
+LAST_SCORE_TIME = pygame.time.get_ticks()
+
 #data file
 DATA_FILE = "data.json"
 
@@ -84,16 +88,18 @@ def load_data():
     try:
         with open(DATA_FILE, "r") as file:
             data = json.load(file)
-            return data.get("TOP_SCORE", 0)
+            top_score = data.get("TOP_SCORE", 0)
+            gold = data.get("GOLD", 0)
+            return top_score, gold
     except FileNotFoundError:
-        return 0
+        return 0, 0
     
 #top score
-TOP_SCORE = load_data()
+TOP_SCORE, GOLD = load_data()
 
 #save data to file
 def save_data():
-    data = {"TOP_SCORE": TOP_SCORE}
+    data = {"TOP_SCORE": TOP_SCORE, "GOLD": GOLD}
     with open(DATA_FILE, "w") as file:
         json.dump(data, file)
 
@@ -363,7 +369,7 @@ class GameState(State):
 
     def create_bullet(self):
         if self.ships and len(self.ships) > 0:
-            
+
             mouse_x, mouse_y = pygame.mouse.get_pos()
             direction = np.array((mouse_x - self.ships[0].position[0], mouse_y - self.ships[0].position[1]))
             magnitude = np.linalg.norm(direction)
@@ -404,7 +410,16 @@ class GameState(State):
 
     #updates position of all items on screen, removes them if a collision is detected or they move off screen
     def update(self, DELTA):
-        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LAST_MISSILE_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LAST_MISSILE_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR, GOLD, LAST_SCORE_TIME, FONT_COLOR_NEW_TOP_SCORE
+
+        #update the score
+        current_time = pygame.time.get_ticks()
+        if current_time - LAST_SCORE_TIME >= 1000:
+            SCORE += 1
+            if SCORE > TOP_SCORE:
+                TOP_SCORE = SCORE
+                FONT_COLOR_TOP_SCORE = FONT_COLOR_NEW_TOP_SCORE
+            LAST_SCORE_TIME = current_time
 
         #create asteroids
         if pygame.time.get_ticks() - LAST_ASTEROID_TIME > ASTEROID_COOLDOWN:
@@ -509,7 +524,7 @@ class GameState(State):
                 self.tethers.remove(tether)
                 
 
-        #bullet collisions
+        #bullet-asteroid collisions
         for asteroid in self.asteroids:
             for bullet in self.bullets:
                 if asteroid != bullet:
@@ -558,7 +573,7 @@ class GameState(State):
                                 clump.velocity = p2.velocity
                                 if p2 in clump.clump:
                                     clump.clump.remove(p2)
-                                SCORE += 10
+                                GOLD += 1
 
         #clump on clump collision simplified
         for clump1 in self.clumps:
@@ -609,11 +624,18 @@ class GameState(State):
         text_score = font.render(f'SCORE: {SCORE}', True, FONT_COLOR)
         screen.blit(text_score, (10,10))
 
+        '''
         #display missile availability
         if pygame.time.get_ticks() - LAST_MISSILE_TIME > MISSILE_COOLDOWN:
             font = pygame.font.Font(None, 36)
             text_missiles = font.render('MISSILES READY', True, FONT_COLOR)
             screen.blit(text_missiles, (10,10 + text_score.get_height() + 10))
+        '''
+
+        #display gold
+        font = pygame.font.Font(None, 36)
+        text_gold = font.render(f'GOLD: {GOLD}', True, FONT_COLOR)
+        screen.blit(text_gold, (10,10 + text_score.get_height() + 10))
 
         #display lives
         font = pygame.font.Font(None, 36)

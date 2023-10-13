@@ -27,11 +27,11 @@ FONT_COLOR_NEW_TOP_SCORE = (0,255,0)
 
 #world constants
 GRAVITY = 9.8 #N/Kg
-FRICTION_COEFFICIENT = 0.4
+FRICTION_COEFFICIENT = 0.6
 LAST_COLOR_CHANGE_TIME = pygame.time.get_ticks()
 COLOR_CHANGE_COOLDOWN = 200
 DIFFICULTY = 1
-DIFFICULTY_RATE = 0.005
+DIFFICULTY_RATE = 0.01
 
 #ship constants
 SHIP_RADIUS = 20
@@ -49,33 +49,33 @@ LAST_BULLET_TIME = pygame.time.get_ticks()
 BULLET_DENSITY = 100
 
 #asteroid constants
-ASTEROID_SPEED = 100 * (DIFFICULTY - 0.8) #pixels per second
+ASTEROID_SPEED = 100 * (DIFFICULTY - 0.2) #pixels per second
 ASTEROID_RADIUS = 10
 ASTEROID_COLOR = (0,255,0)
-ASTEROID_COOLDOWN = 800 * (1 / (DIFFICULTY - 0.3))
+ASTEROID_COOLDOWN = 800 * (1 / (DIFFICULTY - 0.0))
 LAST_ASTEROID_TIME = pygame.time.get_ticks()
 ASTEROID_DENSITY = 1
 
 #clump constants
 LAST_CLUMP_TIME = pygame.time.get_ticks()
-CLUMP_COOLDOWN = 1500 * (DIFFICULTY - 0.1)
-CLUMP_SPEED = 50 * (DIFFICULTY - 0.1)
-CLUMP_RADIUS = 20
+CLUMP_COOLDOWN = 5000 * (DIFFICULTY - 0.1)
+CLUMP_SPEED = 100 * (DIFFICULTY - 0.2)
+CLUMP_RADIUS = 10
 CLUMP_DENSITY = 1
 CLUMP_COLOR = (212,175,55)
 CLUMP_COUNT = 10
 
 #tether constants
-TETHER_COLOR = (255,255,255)
+TETHER_COLOR = (240,240,240)
 TETHER_COST = 100
 
 #portal constants
-PORTAL_SPEED = 50 * (DIFFICULTY - 0.2)
+PORTAL_SPEED = 50 * (DIFFICULTY - 0.0)
 PORTAL_RADIUS = 40
 PORTAL_DENSITY = 1
 PORTAL_COLOR = (0,255,255)
 LAST_PORTAL_TIME = pygame.time.get_ticks()
-PORTAL_COOLDOWN = 5000 * (DIFFICULTY - 0.0)
+PORTAL_COOLDOWN = 10000 * (DIFFICULTY - 0.0)
 
 #game data
 INITIAL_LIVES = 5
@@ -273,11 +273,30 @@ class State:
     def handle_events(self):
         pass
 
-    def update(self):
+    def update(self, DELTA):
         pass
 
     def render(self, screen):
         self.screen = screen
+
+#initial state to start music
+class FirstState(State):
+
+    def __init__(self):
+        super().__init__()
+        pygame.mixer.music.load("audio/title.ogg")
+        pygame.mixer.music.play(-1)
+
+    def handle_events(self):
+        self.next_state = TitleState()
+
+
+    def update(self, DELTA):
+        pass
+
+    def render(self, screen):
+        #clear screen
+        screen.fill(BACKGROUND_COLOR)
 
 #title state
 class TitleState(State):
@@ -285,8 +304,6 @@ class TitleState(State):
 
     def __init__(self):
         super().__init__()
-        pygame.mixer.music.load("audio/title.ogg")
-        pygame.mixer.music.play(-1)
 
     def handle_events(self):
         if pygame.key.get_pressed()[pygame.K_SPACE]:
@@ -322,8 +339,6 @@ class MenuState(State):
 
     def __init__(self):
         super().__init__()
-        pygame.mixer.music.load("audio/title.ogg")
-        pygame.mixer.music.play(-1)
         self.key_1_pressed = False
 
     def handle_events(self):
@@ -396,7 +411,7 @@ class GameState(State):
 
     def handle_events(self):
         if pygame.key.get_pressed()[pygame.K_ESCAPE]:
-            self.next_state = TitleState()
+            self.next_state = FirstState()
 
     def create_asteroid(self):
         #random initial particle state
@@ -484,7 +499,7 @@ class GameState(State):
 
         #update colors
         if pygame.time.get_ticks() - LAST_COLOR_CHANGE_TIME > COLOR_CHANGE_COOLDOWN:
-            PORTAL_COLOR = (random.uniform(0,255), random.uniform(10,255), random.uniform(0,255))
+            PORTAL_COLOR = (random.uniform(0,222), random.uniform(10,222), random.uniform(0,222))
             LAST_COLOR_CHANGE_TIME = pygame.time.get_ticks()
 
 
@@ -685,14 +700,14 @@ class GameState(State):
         for tether in self.tethers:
             tether.render()
 
-        for ship in self.ships:
-            ship.render()
-
         for bullet in self.bullets:
             bullet.render() 
 
         for clump in self.clumps:
             clump.render()
+
+        for ship in self.ships:
+            ship.render()
         
 
         #display score
@@ -715,7 +730,7 @@ class GameState(State):
 
         #display tethers
         font = pygame.font.Font(None, 36)
-        text_tethers = font.render(f'Tethers: {TETHERS}', True, FONT_COLOR)
+        text_tethers = font.render(f'TETHERS: {TETHERS}', True, FONT_COLOR)
         screen.blit(text_tethers, (10,10 + text_score.get_height() + 10 + text_gold.get_height() + 10))
 
         #display lives
@@ -740,7 +755,7 @@ class GameState(State):
         screen.blit(text_fps, ((WIDTH // 2) - (text_fps.get_width() // 2), 10 + text_top_score.get_height() + 10))
 
 #start game on title screen
-CURRENT_STATE = TitleState()
+CURRENT_STATE = FirstState()
 
 #exit variable
 QUIT_GAME = False

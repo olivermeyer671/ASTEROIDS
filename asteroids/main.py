@@ -98,7 +98,7 @@ def load_data():
             gold = data.get("GOLD", 100)
             tethers = data.get("TETHERS", 1)
             return top_score, gold, tethers
-    except FileNotFoundError:
+    except (FileNotFoundError, json.decoder.JSONDecodeError):
         return 0, 100, 1
     
 #top score

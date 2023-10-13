@@ -30,6 +30,8 @@ GRAVITY = 9.8 #N/Kg
 FRICTION_COEFFICIENT = 0.4
 LAST_COLOR_CHANGE_TIME = pygame.time.get_ticks()
 COLOR_CHANGE_COOLDOWN = 200
+DIFFICULTY = 1
+DIFFICULTY_RATE = 0.005
 
 #ship constants
 SHIP_RADIUS = 20
@@ -47,17 +49,17 @@ LAST_BULLET_TIME = pygame.time.get_ticks()
 BULLET_DENSITY = 100
 
 #asteroid constants
-ASTEROID_SPEED = 100 #pixels per second
+ASTEROID_SPEED = 100 * (DIFFICULTY - 0.8) #pixels per second
 ASTEROID_RADIUS = 10
 ASTEROID_COLOR = (0,255,0)
-ASTEROID_COOLDOWN = 800
+ASTEROID_COOLDOWN = 800 * (1 / (DIFFICULTY - 0.3))
 LAST_ASTEROID_TIME = pygame.time.get_ticks()
 ASTEROID_DENSITY = 1
 
 #clump constants
 LAST_CLUMP_TIME = pygame.time.get_ticks()
-CLUMP_COOLDOWN = 1500
-CLUMP_SPEED = 50
+CLUMP_COOLDOWN = 1500 * (DIFFICULTY - 0.1)
+CLUMP_SPEED = 50 * (DIFFICULTY - 0.1)
 CLUMP_RADIUS = 20
 CLUMP_DENSITY = 1
 CLUMP_COLOR = (212,175,55)
@@ -68,12 +70,12 @@ TETHER_COLOR = (255,255,255)
 TETHER_COST = 100
 
 #portal constants
-PORTAL_SPEED = 50
+PORTAL_SPEED = 50 * (DIFFICULTY - 0.2)
 PORTAL_RADIUS = 40
 PORTAL_DENSITY = 1
 PORTAL_COLOR = (0,255,255)
 LAST_PORTAL_TIME = pygame.time.get_ticks()
-PORTAL_COOLDOWN = 5000
+PORTAL_COOLDOWN = 5000 * (DIFFICULTY - 0.0)
 
 #game data
 INITIAL_LIVES = 5
@@ -457,7 +459,7 @@ class GameState(State):
 
     #updates position of all items on screen, removes them if a collision is detected or they move off screen
     def update(self, DELTA):
-        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR, GOLD, LAST_SCORE_TIME, FONT_COLOR_NEW_TOP_SCORE, TETHERS, LAST_PORTAL_TIME, LAST_COLOR_CHANGE_TIME, PORTAL_COLOR
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR, GOLD, LAST_SCORE_TIME, FONT_COLOR_NEW_TOP_SCORE, TETHERS, LAST_PORTAL_TIME, LAST_COLOR_CHANGE_TIME, PORTAL_COLOR, DIFFICULTY_RATE, DIFFICULTY
 
         #update the score
         current_time = pygame.time.get_ticks()
@@ -467,6 +469,10 @@ class GameState(State):
                 TOP_SCORE = SCORE
                 FONT_COLOR_TOP_SCORE = FONT_COLOR_NEW_TOP_SCORE
             LAST_SCORE_TIME = current_time
+            #update the difficulty
+            DIFFICULTY = 1 + SCORE * DIFFICULTY_RATE
+
+        
 
         #remove inactive objects
         self.asteroids = [asteroid for asteroid in self.asteroids if asteroid.active]
@@ -716,6 +722,11 @@ class GameState(State):
         font = pygame.font.Font(None, 36)
         text_lives = font.render(f'LIVES: {LIVES}', True, FONT_COLOR)
         screen.blit(text_lives, (WIDTH - text_lives.get_width() - 10,10))
+
+        #display difficulty factor
+        font = pygame.font.Font(None, 36)
+        text_difficulty = font.render(f'DIFFICULTY: {-100 + 100*DIFFICULTY:.0f}%', True, FONT_COLOR)
+        screen.blit(text_difficulty, (WIDTH - text_difficulty.get_width() - 10, 10 + text_lives.get_height() + 10))
 
         #display top score
         font = pygame.font.Font(None, 36)

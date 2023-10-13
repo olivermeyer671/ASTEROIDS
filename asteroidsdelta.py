@@ -17,7 +17,7 @@ HEIGHT = pygame.display.Info().current_h - 60
 BACKGROUND_COLOR = (0,0,0)
 
 #fps limiter
-FPS = 90
+FPS = 60
 
 #font colors
 FONT_COLOR = (255,0,0)
@@ -118,7 +118,8 @@ MUSIC_TITLE = pygame.mixer.music.load("asteroids/audio/title.ogg")
 
 #audio mixing
 SOUND_BULLET.set_volume(0.3)
-SOUND_HIT.set_volume(0.4)
+SOUND_HIT.set_volume(0.1)
+SOUND_EXPLOSION.set_volume(0.5)
 
 #setup the screen
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -597,7 +598,8 @@ class GameState(State):
         for asteroid in self.asteroids:
             for bullet in self.bullets:
                 if asteroid != bullet:
-                    self.elastic_collision(asteroid,bullet)
+                    if self.elastic_collision(asteroid,bullet):
+                        SOUND_HIT.play()
                         
         #create clumps
         if pygame.time.get_ticks() - LAST_CLUMP_TIME > CLUMP_COOLDOWN:
@@ -637,6 +639,7 @@ class GameState(State):
                                 clump.velocity = p2.velocity
                                 p2.active = False
                                 GOLD += 1
+                                SOUND_HIT.play()
 
         #clump on clump collision simplified
         for clump1 in self.clumps:
@@ -666,6 +669,9 @@ class GameState(State):
         #clear screen
         screen.fill(BACKGROUND_COLOR)
 
+        for portal in self.portals:
+            pygame.draw.circle(SCREEN, PORTAL_COLOR, (portal.position[0], portal.position[1]), portal.radius)
+
         for asteroid in self.asteroids:
             asteroid.render()
 
@@ -680,9 +686,6 @@ class GameState(State):
 
         for clump in self.clumps:
             clump.render()
-
-        for portal in self.portals:
-            pygame.draw.circle(SCREEN, PORTAL_COLOR, (portal.position[0], portal.position[1]), portal.radius)
         
 
         #display score

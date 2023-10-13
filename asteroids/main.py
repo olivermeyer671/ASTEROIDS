@@ -101,7 +101,7 @@ def load_data():
     except (FileNotFoundError, json.decoder.JSONDecodeError):
         return 0, 100, 1
     
-#top score
+#persistant data
 TOP_SCORE, GOLD, TETHERS = load_data()
 
 #save data to file

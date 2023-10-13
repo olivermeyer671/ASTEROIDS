@@ -99,7 +99,7 @@ def load_data():
             tethers = data.get("TETHERS", 1)
             return top_score, gold, tethers
     except FileNotFoundError:
-        return 0, 0, 0
+        return 0, 100, 1
     
 #top score
 TOP_SCORE, GOLD, TETHERS = load_data()

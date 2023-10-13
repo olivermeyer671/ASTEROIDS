@@ -26,13 +26,15 @@ FONT_COLOR_NEW_TOP_SCORE = (0,255,0)
 
 #world constants
 GRAVITY = 9.8 #N/Kg
-FRICTION_COEFFICIENT = 0.1
+FRICTION_COEFFICIENT = 0.4
+LAST_COLOR_CHANGE_TIME = pygame.time.get_ticks()
+COLOR_CHANGE_COOLDOWN = 200
 
 #ship constants
 SHIP_RADIUS = 20
 SHIP_COLOR = (255,0,0)
 SHIP_ACCELERATION = 1000 #pixels per second per second
-SHIP_DENSITY = 1
+SHIP_DENSITY = 10
 MAX_SHIP_SPEED = 250
 
 #bullet constants
@@ -58,10 +60,19 @@ CLUMP_SPEED = 50
 CLUMP_RADIUS = 20
 CLUMP_DENSITY = 1
 CLUMP_COLOR = (212,175,55)
-CLUMP_COUNT = 20
+CLUMP_COUNT = 10
 
 #tether constants
 TETHER_COLOR = (255,255,255)
+TETHER_COST = 100
+
+#portal constants
+PORTAL_SPEED = 50
+PORTAL_RADIUS = 40
+PORTAL_DENSITY = 1
+PORTAL_COLOR = (0,255,255)
+LAST_PORTAL_TIME = pygame.time.get_ticks()
+PORTAL_COOLDOWN = 5000
 
 #game data
 INITIAL_LIVES = 5
@@ -81,8 +92,8 @@ def load_data():
         with open(DATA_FILE, "r") as file:
             data = json.load(file)
             top_score = data.get("TOP_SCORE", 0)
-            gold = data.get("GOLD", 0)
-            tethers = data.get("TETHERS", 0)
+            gold = data.get("GOLD", 100)
+            tethers = data.get("TETHERS", 1)
             return top_score, gold, tethers
     except FileNotFoundError:
         return 0, 0, 0
@@ -128,8 +139,8 @@ class Particle:
 
     def apply_friction(self, coefficient):
         velocity_magnitude = np.linalg.norm(self.velocity)
-        normal_force = self.mass * GRAVITY
-        friction_force = coefficient * normal_force * velocity_magnitude
+        normal_force = GRAVITY  * self.mass
+        friction_force = coefficient * velocity_magnitude * normal_force
         # Calculate the direction of the friction force (opposite to velocity)
         if velocity_magnitude > 0:
             friction_direction = (-self.velocity[0] / velocity_magnitude, -self.velocity[1] / velocity_magnitude)
@@ -152,9 +163,6 @@ class Particle:
             return False
 
     def update(self, DELTA):
-        #global friction
-        #self.apply_friction(FRICTION_COEFFICIENT)
-
         if self.is_invisible():
             self.active = False
 
@@ -189,7 +197,19 @@ class Tether:
         if self.end_particle not in self.end_clump.clump:
             self.active = False
         else:
-            self.end_clump.velocity = self.start_particle.velocity
+            # Calculate the displacement vector between the particles
+            displacement = np.array(self.end_particle.position) - np.array(self.start_particle.position)
+            current_length = np.linalg.norm(displacement)
+            if current_length != 0:
+                #force_magnitude = current_length - self.distance
+                force_magnitude = current_length - 2*(self.end_particle.radius + self.start_particle.radius)
+                force_direction = displacement / current_length
+                force = force_direction * force_magnitude * 10000
+
+                # Check if the tether has become tight
+                    #if current_length > self.distance:  # Change to self.distance
+                self.start_particle.apply_force(force[0], force[1])
+                self.end_clump.box.apply_force(-force[0], -force[1])
 
     def render(self):
         pygame.draw.aaline(SCREEN, self.color, self.start_particle.position, self.end_particle.position)
@@ -219,17 +239,20 @@ class Clump:
                 return clump
 
     def update(self, DELTA):
+        self.velocity = self.box.velocity
+        self.acceleration = self.box.acceleration
         self.mass = len(self.clump) * self.density * math.pi * self.radius * self.radius  + 0.000001 #minimum mass to prevent error in particle update
+        self.box.mass = self.mass
+        self.box.update(DELTA)
         for particle in self.clump:
             if not particle.active:
                 self.clump.remove(particle)
             else:
                 particle.velocity = self.velocity
+                particle.acceleration = self.acceleration
                 particle.mass = self.mass
                 particle.update(DELTA)
-        self.box.velocity = self.velocity
-        self.box.mass = self.mass
-        self.box.update(DELTA)
+
 
         if len(self.clump) == 0:
             self.active = False
@@ -307,8 +330,8 @@ class MenuState(State):
         global GOLD, TETHERS
         pressed_1 = pygame.key.get_pressed()[pygame.K_1]
         if pressed_1 and not self.key_1_pressed:
-            if GOLD >= 1:
-                GOLD -= 1
+            if GOLD >= TETHER_COST:
+                GOLD -= TETHER_COST
                 TETHERS += 1
             self.key_1_pressed = True
         elif not pressed_1:
@@ -345,7 +368,7 @@ class MenuState(State):
 
         #display tethers
         font = pygame.font.Font(None, 36)
-        text_tethers = font.render(f'Tethers: {TETHERS} (to buy more press 1)', True, FONT_COLOR)
+        text_tethers = font.render(f'Tethers: {TETHERS} (${TETHER_COST} each, to buy more press 1)', True, FONT_COLOR)
         screen.blit(text_tethers, (10,10 + text_score.get_height() + 10 + text_gold.get_height() + 10))
 
 #game state
@@ -364,6 +387,7 @@ class GameState(State):
         self.bullets = []
         self.clumps = []
         self.tethers = []
+        self.portals = []
         
 
     def handle_events(self):
@@ -431,7 +455,7 @@ class GameState(State):
 
     #updates position of all items on screen, removes them if a collision is detected or they move off screen
     def update(self, DELTA):
-        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR, GOLD, LAST_SCORE_TIME, FONT_COLOR_NEW_TOP_SCORE, TETHERS
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR, GOLD, LAST_SCORE_TIME, FONT_COLOR_NEW_TOP_SCORE, TETHERS, LAST_PORTAL_TIME, LAST_COLOR_CHANGE_TIME, PORTAL_COLOR
 
         #update the score
         current_time = pygame.time.get_ticks()
@@ -448,7 +472,45 @@ class GameState(State):
         self.bullets = [bullet for bullet in self.bullets if bullet.active]
         self.clumps = [clump for clump in self.clumps if clump.active]
         self.tethers = [tether for tether in self.tethers if tether.active]
+        self.portals = [portal for portal in self.portals if portal.active]
 
+        #update colors
+        if pygame.time.get_ticks() - LAST_COLOR_CHANGE_TIME > COLOR_CHANGE_COOLDOWN:
+            PORTAL_COLOR = (random.uniform(0,255), random.uniform(10,255), random.uniform(0,255))
+            LAST_COLOR_CHANGE_TIME = pygame.time.get_ticks()
+
+
+        #create portals
+        if pygame.time.get_ticks() - LAST_PORTAL_TIME > PORTAL_COOLDOWN:
+            #random initial particle state
+            position = np.array([random.uniform(0, WIDTH), 0])
+            angle = random.uniform(math.pi/4, 3*math.pi/4)
+            speed = PORTAL_SPEED*random.uniform(0.5, 6)
+            velocity = np.array([speed * math.cos(angle), speed * math.sin(angle)])
+            #acceleration = np.array([random.uniform(-100, 100),random.uniform(-100, 100)])
+            acceleration = np.array([0,0])
+            radius = PORTAL_RADIUS*random.uniform(0.5, 2)
+            density = PORTAL_DENSITY
+            color = PORTAL_COLOR
+
+            new_portal = Particle(position, velocity, acceleration, radius, density, color)
+            self.portals.append(new_portal)
+            LAST_PORTAL_TIME = pygame.time.get_ticks()
+
+        #update portals
+        for portal in self.portals:
+            portal.update(DELTA)
+
+        #portal collisions
+        for portal in self.portals:
+            for tether in self.tethers:
+                clump = tether.end_clump
+                for p1 in clump.clump:
+                    distance = np.linalg.norm(np.array(p1.position) - np.array(portal.position))
+                    if distance < portal.radius:
+                        p1.active = False
+                        GOLD += 10
+        
         #create asteroids
         if pygame.time.get_ticks() - LAST_ASTEROID_TIME > ASTEROID_COOLDOWN:
             self.create_asteroid()
@@ -480,16 +542,12 @@ class GameState(State):
             FORCE = SHIP_ACCELERATION * ship.mass
             keys = pygame.key.get_pressed()
             if keys[pygame.K_UP] or keys[pygame.K_w]:
-                #if (ship.velocity[1] > -MAX_SHIP_SPEED):
                     ship.apply_force(0 ,-FORCE)
             if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-                #if (ship.velocity[1] < MAX_SHIP_SPEED):
                     ship.apply_force(0 , FORCE)
             if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-                #if (ship.velocity[0] > - MAX_SHIP_SPEED):
                     ship.apply_force(-FORCE , 0)
             if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-                #if (ship.velocity[0] < MAX_SHIP_SPEED):
                     ship.apply_force(FORCE , 0)
             
         #ship collisions
@@ -515,16 +573,16 @@ class GameState(State):
             bullet.update(DELTA)
 
         #create tethers on entire asteroid clump
-        if pygame.mouse.get_pressed()[2]:
-            mouse_x, mouse_y = pygame.mouse.get_pos()
-            for clump in self.clumps:
-                flag = False
-                for circle in clump.clump:
-                    distance = np.linalg.norm(np.array(circle.position) - np.array((mouse_x, mouse_y)))
-                    if distance <= circle.radius:
-                        flag = True
-                    if flag:
-                        if (TETHERS > 0):
+        if (TETHERS > 0):
+            if pygame.mouse.get_pressed()[2]:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                for clump in self.clumps:
+                    flag = False
+                    for circle in clump.clump:
+                        distance = np.linalg.norm(np.array(circle.position) - np.array((mouse_x, mouse_y)))
+                        if distance <= circle.radius:
+                            flag = True
+                        if flag:
                             if not any(tether.end_clump == clump for tether in self.tethers):
                                 for circle in clump.clump:
                                     self.tethers.append(Tether(self.ships[0], clump, circle))
@@ -532,6 +590,7 @@ class GameState(State):
 
         #update tethers
         for tether in self.tethers:
+            tether.end_clump.box.apply_friction(FRICTION_COEFFICIENT / 10)
             tether.update(DELTA)
             
         #bullet-asteroid collisions
@@ -556,16 +615,15 @@ class GameState(State):
 
             self.clumps.append(Clump(position, velocity, acceleration, radius, density, color, CLUMP_COUNT))
 
-        #update clumps (if clump is tethered, clump.update is dealt with through tether update)
+        #update clumps
         for clump in self.clumps:
-            #if (self.ships and (self.ships[0], clump) not in self.tethered_clumps):
             clump.update(DELTA)
         
         #clump on asteroids and ship collisions
         for list in [self.asteroids, self.ships]:
             for p1 in list:
                 for clump in self.clumps:
-                    for p2 in clump.clump:
+                        p2 = clump.box
                         if p1 != p2:
                             if self.elastic_collision(p1,p2):
                                 clump.velocity = p2.velocity
@@ -622,6 +680,9 @@ class GameState(State):
 
         for clump in self.clumps:
             clump.render()
+
+        for portal in self.portals:
+            pygame.draw.circle(SCREEN, PORTAL_COLOR, (portal.position[0], portal.position[1]), portal.radius)
         
 
         #display score

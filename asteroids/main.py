@@ -10,6 +10,7 @@ import numpy as np
 pygame.init()
 pygame.mixer.init()
 clock = pygame.time.Clock()
+music = pygame.mixer.music
 
 #screen constants
 WIDTH = pygame.display.Info().current_w
@@ -284,8 +285,9 @@ class FirstState(State):
 
     def __init__(self):
         super().__init__()
-        pygame.mixer.music.load("audio/title.ogg")
-        pygame.mixer.music.play(-1)
+        music.load("audio/title.ogg")
+        music.play(-1)
+        #pygame.time.delay(100)
 
     def handle_events(self):
         self.next_state = TitleState()
@@ -307,6 +309,7 @@ class TitleState(State):
 
     def handle_events(self):
         if pygame.key.get_pressed()[pygame.K_SPACE]:
+            music.stop()
             self.next_state = GameState()
         if pygame.key.get_pressed()[pygame.K_m]:
             self.next_state = MenuState()
@@ -398,8 +401,8 @@ class GameState(State):
         FONT_COLOR_TOP_SCORE = FONT_COLOR
         SCORE = INITIAL_SCORE
         LIVES = INITIAL_LIVES
-        pygame.mixer.music.load("audio/theme.ogg")
-        pygame.mixer.music.play(-1)
+        music.load("audio/theme.ogg")
+        music.play(-1)
         pygame.time.delay(500)
         self.asteroids = []
         self.ships = [Particle((WIDTH / 2, 2 * HEIGHT / 3), (0, 0), (0, 0), SHIP_RADIUS, SHIP_DENSITY, SHIP_COLOR)]
@@ -411,6 +414,7 @@ class GameState(State):
 
     def handle_events(self):
         if pygame.key.get_pressed()[pygame.K_ESCAPE]:
+            music.stop()
             self.next_state = FirstState()
 
     def create_asteroid(self):
@@ -585,7 +589,8 @@ class GameState(State):
                             LIVES = 4
                             save_data()
                             SOUND_GAME_OVER.play()
-                            self.next_state = TitleState()
+                            music.stop()
+                            self.next_state = FirstState()
                 
         #update bullets
         if (pygame.mouse.get_pressed()[0] or pygame.key.get_pressed()[pygame.K_SPACE]) and pygame.time.get_ticks() - LAST_BULLET_TIME > BULLET_COOLDOWN:

@@ -36,7 +36,7 @@ DIFFICULTY_RATE = 0.01
 
 #ship constants
 SHIP_RADIUS = 20
-SHIP_COLOR = (255,0,0)
+SHIP_COLOR = (0,0,255)
 SHIP_ACCELERATION = 1000 #pixels per second per second
 SHIP_DENSITY = 10
 MAX_SHIP_SPEED = 250
@@ -52,10 +52,11 @@ BULLET_DENSITY = 100
 #asteroid constants
 ASTEROID_SPEED = 100 * (DIFFICULTY - 0.2) #pixels per second
 ASTEROID_RADIUS = 10
-ASTEROID_COLOR = (0,255,0)
+ASTEROID_COLOR = (255,0,0)
 ASTEROID_COOLDOWN = 800 * (1 / (DIFFICULTY - 0.0))
 LAST_ASTEROID_TIME = pygame.time.get_ticks()
 ASTEROID_DENSITY = 1
+COLOR_DIRECTION = 1
 
 #clump constants
 LAST_CLUMP_TIME = pygame.time.get_ticks()
@@ -184,8 +185,8 @@ class Particle:
             #remove applied force
             self.force = [0, 0]
         
-    def render(self):
-        pygame.draw.circle(SCREEN, self.color, (self.position[0], self.position[1]), self.radius)
+    def render(self, color):
+        pygame.draw.circle(SCREEN, color, (self.position[0], self.position[1]), self.radius)
 
 
 #class for tethers
@@ -216,8 +217,8 @@ class Tether:
                 self.start_particle.apply_force(force[0], force[1])
                 self.end_clump.box.apply_force(-force[0], -force[1])
 
-    def render(self):
-        pygame.draw.aaline(SCREEN, self.color, self.start_particle.position, self.end_particle.position)
+    def render(self, color):
+        pygame.draw.aaline(SCREEN, color, self.start_particle.position, self.end_particle.position)
 
 #class for clumps
 class Clump:
@@ -262,9 +263,9 @@ class Clump:
         if len(self.clump) == 0:
             self.active = False
         
-    def render(self):
+    def render(self, color):
         for particle in self.clump:
-            particle.render()
+            particle.render(color)
 
 #state manager interface
 class State:
@@ -328,12 +329,12 @@ class TitleState(State):
 
         #display press spacebar
         font = pygame.font.Font(None, 18)
-        text_prompt = font.render("press space to play, m for menu", True, FONT_COLOR)
+        text_prompt = font.render("Press  [ space ]  to  play.  Press  [ m ]  for  MENU:  Instructions,  Controls,  Store", True, FONT_COLOR)
         screen.blit(text_prompt, ((WIDTH // 2) - (text_prompt.get_width() // 2), (HEIGHT // 2) - (text_prompt.get_height() // 2) + (text.get_height() // 2) + 10))
 
         #display top score
         font = pygame.font.Font(None, 36)
-        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
+        text_top_score = font.render(f'TOP  SCORE :  {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
         screen.blit(text_top_score, ((WIDTH // 2) - (text_top_score.get_width() // 2), 10))
 
 #menu state
@@ -370,27 +371,42 @@ class MenuState(State):
 
         #display press spacebar
         font = pygame.font.Font(None, 18)
-        text_prompt = font.render("press escape for titlescreen", True, FONT_COLOR)
+        text_prompt = font.render("INSTRUCTIONS :  avoid  the  red  asteroids.  use  tethers  to  drag  gold  asteroids  into  rainbow  portals.  Press  [ escape ]  for  Title  Screen.", True, FONT_COLOR)
         screen.blit(text_prompt, ((WIDTH // 2) - (text_prompt.get_width() // 2), (HEIGHT // 2) - (text_prompt.get_height() // 2) + (text.get_height() // 2) + 10))
+
+        #display controls
+        font = pygame.font.Font(None, 18)
+        text_move = font.render("MOVEMENT :  wasd  /  arrow  keys", True, FONT_COLOR)
+        screen.blit(text_move, ((WIDTH // 2) - (text_move.get_width() // 2), (HEIGHT // 2) - (text_move.get_height() // 2) + (text.get_height() // 2 + 10) + (text_prompt.get_height() // 2 + 10)))
+
+        #display controls
+        font = pygame.font.Font(None, 18)
+        text_shoot = font.render("SHOOT :  space  key  /  left  click  towards  target", True, FONT_COLOR)
+        screen.blit(text_shoot, ((WIDTH // 2) - (text_shoot.get_width() // 2), (HEIGHT // 2) - (text_shoot.get_height() // 2) + (text.get_height() // 2 + 10) + (text_prompt.get_height() // 2 + 10) + (text_move.get_height() // 2 + 10)))
+
+        #display controls
+        font = pygame.font.Font(None, 18)
+        text_tether = font.render("TETHER :  return  key  /  right  click  on  gold  asteroid", True, FONT_COLOR)
+        screen.blit(text_tether, ((WIDTH // 2) - (text_tether.get_width() // 2), (HEIGHT // 2) - (text_tether.get_height() // 2) + (text.get_height() // 2 + 10) + (text_prompt.get_height() // 2 + 10) + (text_move.get_height() // 2 + 10) + (text_shoot.get_height() // 2 + 10)))
 
         #display top score
         font = pygame.font.Font(None, 36)
-        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
+        text_top_score = font.render(f'TOP  SCORE :  {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
         screen.blit(text_top_score, ((WIDTH // 2) - (text_top_score.get_width() // 2), 10))
 
-        #display score
+        #display store
         font = pygame.font.Font(None, 36)
-        text_score = font.render(f'SCORE: {SCORE}', True, FONT_COLOR)
-        #screen.blit(text_score, (10,10))
+        text_score = font.render(f'STORE:', True, FONT_COLOR)
+        screen.blit(text_score, (10,10))
 
         #display gold
         font = pygame.font.Font(None, 36)
-        text_gold = font.render(f'GOLD: {GOLD}', True, FONT_COLOR)
+        text_gold = font.render(f'GOLD:  {GOLD}', True, CLUMP_COLOR)
         screen.blit(text_gold, (10,10 + text_score.get_height() + 10))
 
         #display tethers
         font = pygame.font.Font(None, 36)
-        text_tethers = font.render(f'Tethers: {TETHERS} (${TETHER_COST} each, to buy more press 1)', True, FONT_COLOR)
+        text_tethers = font.render(f'Tethers:  {TETHERS} (${TETHER_COST}  each,  to  buy  more  press  1)', True, TETHER_COLOR)
         screen.blit(text_tethers, (10,10 + text_score.get_height() + 10 + text_gold.get_height() + 10))
 
 #game state
@@ -478,7 +494,7 @@ class GameState(State):
 
     #updates position of all items on screen, removes them if a collision is detected or they move off screen
     def update(self, DELTA):
-        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR, GOLD, LAST_SCORE_TIME, FONT_COLOR_NEW_TOP_SCORE, TETHERS, LAST_PORTAL_TIME, LAST_COLOR_CHANGE_TIME, PORTAL_COLOR, DIFFICULTY_RATE, DIFFICULTY
+        global LAST_BULLET_TIME, LAST_ASTEROID_TIME, LIVES, SCORE, TOP_SCORE, FONT_COLOR, FONT_COLOR_TOP_SCORE, FORCE, MAX_SHIP_SPEED, ASTEROID_COLOR, LAST_CLUMP_TIME, CLUMP_COLOR, GOLD, LAST_SCORE_TIME, FONT_COLOR_NEW_TOP_SCORE, TETHERS, LAST_PORTAL_TIME, LAST_COLOR_CHANGE_TIME, PORTAL_COLOR, DIFFICULTY_RATE, DIFFICULTY, COLOR_DIRECTION
 
         #update the score
         current_time = pygame.time.get_ticks()
@@ -505,7 +521,11 @@ class GameState(State):
         if pygame.time.get_ticks() - LAST_COLOR_CHANGE_TIME > COLOR_CHANGE_COOLDOWN:
             PORTAL_COLOR = (random.uniform(0,222), random.uniform(10,222), random.uniform(0,222))
             LAST_COLOR_CHANGE_TIME = pygame.time.get_ticks()
-
+        if (ASTEROID_COLOR[0] == 100):
+            COLOR_DIRECTION = 5
+        if (ASTEROID_COLOR[0] == 255):
+            COLOR_DIRECTION = -5
+        ASTEROID_COLOR = ((ASTEROID_COLOR[0] + COLOR_DIRECTION),0,0)
 
         #create portals
         if pygame.time.get_ticks() - LAST_PORTAL_TIME > PORTAL_COOLDOWN:
@@ -546,8 +566,6 @@ class GameState(State):
         #update asteroids
         for asteroid in self.asteroids:
             asteroid.update(DELTA)
-
-        #CLUMP_COLOR = (random.uniform(0,255), random.uniform(10,255), random.uniform(0,255))
 
         #asteroid collisions
         for p1 in self.asteroids:
@@ -593,8 +611,12 @@ class GameState(State):
                             self.next_state = FirstState()
                 
         #update bullets
-        if (pygame.mouse.get_pressed()[0] or pygame.key.get_pressed()[pygame.K_SPACE]) and pygame.time.get_ticks() - LAST_BULLET_TIME > BULLET_COOLDOWN:
+        if (pygame.mouse.get_pressed()[0] and pygame.time.get_ticks() - LAST_BULLET_TIME > BULLET_COOLDOWN):
             self.create_bullet()
+            LAST_BULLET_TIME = pygame.time.get_ticks()
+            SOUND_BULLET.play()
+        if (pygame.key.get_pressed()[pygame.K_SPACE] and pygame.time.get_ticks() - LAST_BULLET_TIME > BULLET_COOLDOWN):
+            self.bullets.append(Particle(self.ships[0].position, (self.ships[0].velocity[0], self.ships[0].velocity[1] - BULLET_SPEED), (0,0), BULLET_RADIUS, BULLET_DENSITY, BULLET_COLOR))
             LAST_BULLET_TIME = pygame.time.get_ticks()
             SOUND_BULLET.play()
         for bullet in self.bullets:
@@ -615,6 +637,24 @@ class GameState(State):
                                 for circle in clump.clump:
                                     self.tethers.append(Tether(self.ships[0], clump, circle))
                                 TETHERS -= 1
+
+        #create tethers on return key press
+        if (TETHERS > 0):
+            if pygame.key.get_pressed()[pygame.K_RETURN]:
+                closest_clump = None
+                closest_distance = math.inf
+                for clump in self.clumps:
+                    flag = False
+                    for circle in clump.clump:
+                        distance = np.linalg.norm(np.array(circle.position) - np.array((self.ships[0].position)))
+                        if distance < closest_distance:
+                            closest_distance = distance
+                            closest_clump = clump
+                if closest_clump:
+                    if not any(tether.end_clump == closest_clump for tether in self.tethers):
+                        for circle in closest_clump.clump:
+                            self.tethers.append(Tether(self.ships[0], closest_clump, circle))
+                        TETHERS -= 1
 
         #update tethers
         for tether in self.tethers:
@@ -697,27 +737,27 @@ class GameState(State):
         screen.fill(BACKGROUND_COLOR)
 
         for portal in self.portals:
-            pygame.draw.circle(SCREEN, PORTAL_COLOR, (portal.position[0], portal.position[1]), portal.radius)
+            portal.render(PORTAL_COLOR)
 
         for asteroid in self.asteroids:
-            asteroid.render()
+            asteroid.render(ASTEROID_COLOR)
 
         for tether in self.tethers:
-            tether.render()
+            tether.render(TETHER_COLOR)
 
         for bullet in self.bullets:
-            bullet.render() 
+            bullet.render(BULLET_COLOR) 
 
         for clump in self.clumps:
-            clump.render()
+            clump.render(CLUMP_COLOR)
 
         for ship in self.ships:
-            ship.render()
+            ship.render(SHIP_COLOR)
         
 
         #display score
         font = pygame.font.Font(None, 36)
-        text_score = font.render(f'SCORE: {SCORE}', True, FONT_COLOR)
+        text_score = font.render(f'SCORE : {SCORE}', True, FONT_COLOR)
         screen.blit(text_score, (10,10))
 
         '''
@@ -730,33 +770,33 @@ class GameState(State):
 
         #display gold
         font = pygame.font.Font(None, 36)
-        text_gold = font.render(f'GOLD: {GOLD}', True, FONT_COLOR)
+        text_gold = font.render(f'GOLD :  {GOLD}', True, CLUMP_COLOR)
         screen.blit(text_gold, (10,10 + text_score.get_height() + 10))
 
         #display tethers
         font = pygame.font.Font(None, 36)
-        text_tethers = font.render(f'TETHERS: {TETHERS}', True, FONT_COLOR)
+        text_tethers = font.render(f'TETHERS :  {TETHERS}', True, TETHER_COLOR)
         screen.blit(text_tethers, (10,10 + text_score.get_height() + 10 + text_gold.get_height() + 10))
 
         #display lives
         font = pygame.font.Font(None, 36)
-        text_lives = font.render(f'LIVES: {LIVES}', True, FONT_COLOR)
+        text_lives = font.render(f'LIVES :  {LIVES}', True, SHIP_COLOR)
         screen.blit(text_lives, (WIDTH - text_lives.get_width() - 10,10))
 
         #display difficulty factor
         font = pygame.font.Font(None, 36)
-        text_difficulty = font.render(f'DIFFICULTY: {-100 + 100*DIFFICULTY:.0f}%', True, FONT_COLOR)
+        text_difficulty = font.render(f'DIFFICULTY :  {-100 + 100*DIFFICULTY:.0f}%', True, FONT_COLOR)
         screen.blit(text_difficulty, (WIDTH - text_difficulty.get_width() - 10, 10 + text_lives.get_height() + 10))
 
         #display top score
         font = pygame.font.Font(None, 36)
-        text_top_score = font.render(f'TOP SCORE: {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
+        text_top_score = font.render(f'TOP  SCORE :  {TOP_SCORE}', True, FONT_COLOR_TOP_SCORE)
         screen.blit(text_top_score, ((WIDTH // 2) - (text_top_score.get_width() // 2), 10))
 
         #display fps
         font = pygame.font.Font(None, 36)
         fps = clock.get_fps()
-        text_fps = font.render(f'FPS: {fps:.0f}', True, FONT_COLOR)
+        text_fps = font.render(f'FPS :  {fps:.0f}', True, FONT_COLOR)
         screen.blit(text_fps, ((WIDTH // 2) - (text_fps.get_width() // 2), 10 + text_top_score.get_height() + 10))
 
 #start game on title screen

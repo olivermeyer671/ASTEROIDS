@@ -45,7 +45,7 @@ MAX_SHIP_SPEED = 250
 BULLET_SPEED = 1000
 BULLET_RADIUS = 2
 BULLET_COLOR = (0,0,255)
-BULLET_COOLDOWN = 50
+BULLET_COOLDOWN = 40
 LAST_BULLET_TIME = pygame.time.get_ticks()
 BULLET_DENSITY = 100
 
@@ -644,12 +644,12 @@ class GameState(State):
                 closest_clump = None
                 closest_distance = math.inf
                 for clump in self.clumps:
-                    flag = False
-                    for circle in clump.clump:
-                        distance = np.linalg.norm(np.array(circle.position) - np.array((self.ships[0].position)))
-                        if distance < closest_distance:
-                            closest_distance = distance
-                            closest_clump = clump
+                    if not any(tether.end_clump == clump for tether in self.tethers):
+                        for circle in clump.clump:
+                            distance = np.linalg.norm(np.array(circle.position) - np.array((self.ships[0].position)))
+                            if distance < closest_distance:
+                                closest_distance = distance
+                                closest_clump = clump
                 if closest_clump:
                     if not any(tether.end_clump == closest_clump for tether in self.tethers):
                         for circle in closest_clump.clump:
